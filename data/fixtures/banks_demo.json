@@ -1,0 +1,11 @@
+{
+  "fixture_notice": "DEMO/SAMPLE synthetic development data. Fictional tickers and fictional values; not current Sectors data.",
+  "results": [
+    {"symbol": "DEMO001", "company_name": "SAMPLE BANK ALPHA", "query_values": {"sub_sector": "Banks", "revenue[2024]": 100, "revenue[2025]": 110}},
+    {"symbol": "DEMO002", "company_name": "SAMPLE BANK BRAVO", "query_values": {"sub_sector": "Banks", "revenue[2024]": 100, "revenue[2025]": 108}},
+    {"symbol": "DEMO003", "company_name": "SAMPLE BANK CHARLIE", "query_values": {"sub_sector": "Banks", "revenue[2024]": 100, "revenue[2025]": 112}},
+    {"symbol": "DEMO004", "company_name": "SAMPLE BANK DELTA", "query_values": {"sub_sector": "Banks", "revenue[2024]": 100, "revenue[2025]": 105}},
+    {"symbol": "DEMO005", "company_name": "SAMPLE BANK ECHO", "query_values": {"sub_sector": "Banks", "revenue[2024]": 100, "revenue[2025]": 200}}
+  ],
+  "pagination": {"total_count": 5, "showing": 5, "limit": 5, "offset": 0}
+}

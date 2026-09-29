@@ -1,0 +1,13 @@
+[project]
+name = "nusa-intelligence"
+version = "0.1.0"
+description = "Credit-conscious Indonesian bank discovery foundation"
+requires-python = ">=3.10"
+dependencies = ["pandas>=2.2"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]

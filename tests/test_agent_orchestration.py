@@ -1,0 +1,300 @@
+import unittest
+
+from nusa.agent.orchestration import (
+    IntentResolver,
+    ResearchOrchestrator,
+    ResearchPlanner,
+    ResearchTask,
+    ToolExecutionContext,
+    ToolRouter,
+    ToolRegistry,
+    UnsupportedIntentError,
+    UnsupportedToolError,
+    create_default_tool_registry,
+    validate_plan,
+)
+from nusa.agent.synthesis import LLMResearchSynthesizer
+from nusa.agent.session_memory import ResearchSessionMemory
+from nusa.discovery.banks import normalize_bank_universe
+from nusa.discovery.workflow import build_discovery_data, discover_banks
+from nusa.providers.base import BankUniverseResult, CompanyData, DataSourceStatus
+
+
+def discovery_fixture():
+    return {
+        "results": [
+            {
+                "symbol": ticker,
+                "company_name": f"SAMPLE BANK {ticker}",
+                "query_values": {"revenue[2024]": 100, "revenue[2025]": value},
+            }
+            for ticker, value in [
+                ("BBRI", 110),
+                ("BBCA", 108),
+                ("BMRI", 112),
+                ("BBNI", 105),
+                ("BRIS", 200),
+            ]
+        ],
+        "pagination": {"total_count": 5, "showing": 5, "limit": 5},
+    }
+
+
+class InMemoryProvider:
+    def __init__(self):
+        self.status = DataSourceStatus(
+            mode="demo",
+            source="DEMO/SAMPLE orchestration fixture",
+            is_live=False,
+            retrieved_at="2026-09-29T10:00:00+00:00",
+            warning="DEMO/SAMPLE; not live data.",
+        )
+        self.universe = normalize_bank_universe(discovery_fixture())
+        self.discovery = build_discovery_data(self.universe, self.status, data_mode="synthetic")
+        self.company_requests = []
+
+    def get_bank_universe(self, force_refresh=False):
+        return BankUniverseResult(self.universe, self.status)
+
+    def get_discovery_data(self, force_refresh=False):
+        return self.discovery
+
+    def get_company_data(self, ticker):
+        self.company_requests.append(ticker)
+        normalized = ticker.removesuffix(".JK")
+        record = self.universe.frame[self.universe.frame["ticker"] == normalized].iloc[0]
+        return CompanyData(ticker=ticker, data=record.dropna().to_dict(), status=self.status)
+
+
+class IntentAndPlanningTests(unittest.TestCase):
+    def test_resolver_maps_supported_requests_to_intents_and_idx_tickers(self):
+        resolver = IntentResolver()
+
+        self.assertEqual(resolver.resolve("Find unusual banks").intent, "DISCOVER")
+        investigate = resolver.resolve("Investigate BBRI")
+        self.assertEqual(investigate.intent, "INVESTIGATE")
+        self.assertEqual(investigate.tickers, ("BBRI.JK",))
+        compare = resolver.resolve("Compare BBRI with BBCA and BMRI")
+        self.assertEqual(compare.intent, "COMPARE")
+        self.assertEqual(compare.tickers, ("BBRI.JK", "BBCA.JK", "BMRI.JK"))
+        self.assertEqual(
+            resolver.resolve("Compare BBRI with BBCA in the market").tickers,
+            ("BBRI.JK", "BBCA.JK"),
+        )
+
+    def test_resolver_rejects_unsupported_or_incomplete_intents(self):
+        resolver = IntentResolver()
+
+        with self.assertRaises(UnsupportedIntentError):
+            resolver.resolve("Write a poem about markets")
+        with self.assertRaises(UnsupportedIntentError):
+            resolver.resolve("Compare BBRI with itself")
+
+    def test_planner_emits_structured_investigation_plan(self):
+        plan = ResearchPlanner().create_plan("Investigate BBRI")
+        serialized = plan.to_dict()
+
+        self.assertEqual(serialized["intent"], "INVESTIGATE")
+        self.assertEqual(serialized["ticker"], "BBRI.JK")
+        self.assertEqual(
+            [task["tool"] for task in serialized["tasks"]],
+            ["get_company_evidence", "calculate_trends", "compare_peer_metrics"],
+        )
+        self.assertTrue(all(task["purpose"] for task in serialized["tasks"]))
+
+    def test_plan_validation_rejects_unregistered_tools(self):
+        registry = create_default_tool_registry()
+        plan = ResearchPlanner().create_plan("Investigate BBRI")
+        plan.tasks[0] = ResearchTask("execute_python", "arbitrary code", {"code": "1+1"})
+
+        with self.assertRaises(UnsupportedToolError):
+            validate_plan(plan, registry)
+
+    def test_plan_validation_rejects_ticker_arguments_outside_resolved_intent(self):
+        registry = create_default_tool_registry()
+        plan = ResearchPlanner().create_plan("Investigate BBRI")
+        plan.tasks[0] = ResearchTask(
+            "get_company_evidence",
+            "Fetch company details and supporting evidence.",
+            {"ticker": "BMRI.JK"},
+        )
+
+        with self.assertRaises(ValueError):
+            validate_plan(plan, registry)
+
+    def test_plan_validation_rejects_repeated_tool_invocations(self):
+        registry = create_default_tool_registry()
+        plan = ResearchPlanner().create_plan("Find unusual banks")
+        plan.tasks.append(plan.tasks[0])
+
+        with self.assertRaises(ValueError):
+            validate_plan(plan, registry)
+
+
+class RoutingAndOrchestrationTests(unittest.TestCase):
+    def test_router_rejects_unsupported_tools_and_unexpected_arguments(self):
+        provider = InMemoryProvider()
+        context = ToolExecutionContext(provider)
+        router = ToolRouter(create_default_tool_registry())
+
+        with self.assertRaises(UnsupportedToolError):
+            router.route(ResearchTask("run_shell", "unsafe", {}), context)
+        with self.assertRaises(ValueError):
+            router.route(
+                ResearchTask("get_bank_universe", "fetch", {"url": "https://evil"}),
+                context,
+            )
+
+    def test_router_executes_only_registered_bank_universe_tool(self):
+        provider = InMemoryProvider()
+        context = ToolExecutionContext(provider)
+        router = ToolRouter(create_default_tool_registry())
+
+        output = router.route(ResearchTask("get_bank_universe", "Fetch bounded universe."), context)
+
+        self.assertEqual(len(output.value["rows"]), 5)
+        self.assertFalse(output.status.is_live)
+
+    def test_orchestrator_runs_plan_tools_collects_evidence_and_traces_operations(self):
+        provider = InMemoryProvider()
+        orchestrator = ResearchOrchestrator(provider)
+
+        result = orchestrator.run("Investigate BBRI")
+
+        self.assertEqual(result.plan.intent, "INVESTIGATE")
+        self.assertEqual(provider.company_requests, ["BBRI.JK"])
+        self.assertTrue(result.evidence_ledger.by_ticker("BBRI"))
+        self.assertEqual(result.synthesis_context["data_source"]["mode"], "demo")
+        self.assertEqual(result.synthesis.generation_mode, "template")
+        self.assertTrue(result.synthesis.evidence_references)
+        self.assertEqual(
+            result.synthesis.evidence_references,
+            [item.evidence_id for item in result.evidence_ledger],
+        )
+        events = [event.event for event in result.trace.events]
+        expected_events = [
+            "PLAN_CREATED",
+            "PLAN_VALIDATED",
+            "TOOL_STARTED",
+            "TOOL_COMPLETED",
+            "ANALYSIS_COMPLETED",
+            "EVIDENCE_VALIDATED",
+            "SYNTHESIS_CONTEXT_PREPARED",
+            "SYNTHESIS_COMPLETED",
+        ]
+        event_positions = [events.index(event) for event in expected_events]
+        self.assertEqual(event_positions, sorted(event_positions))
+        self.assertNotIn("chain_of_thought", str(result.trace.to_dict()).lower())
+        self.assertNotIn("Investigate BBRI", str(result.trace.to_dict()))
+
+    def test_discover_and_compare_plans_execute_with_registered_tools(self):
+        provider = InMemoryProvider()
+        orchestrator = ResearchOrchestrator(provider)
+
+        discovery = orchestrator.run("Find unusual banks")
+        comparison = orchestrator.run("Compare BBRI with BBCA and BMRI")
+
+        self.assertEqual(discovery.plan.intent, "DISCOVER")
+        self.assertEqual(comparison.plan.intent, "COMPARE")
+        self.assertIn("compare_peer_metrics", comparison.outputs)
+        self.assertEqual(comparison.outputs["compare_peer_metrics"].value["tickers"], [
+            "BBRI.JK", "BBCA.JK", "BMRI.JK"
+        ])
+
+    def test_llm_can_resolve_only_when_deterministic_intent_parser_cannot(self):
+        class PlanMock:
+            def __init__(self):
+                self.calls = 0
+
+            def complete_json(self, system_prompt, user_prompt):
+                self.calls += 1
+                return {
+                    "intent": "COMPARE",
+                    "tickers": ["BBRI.JK", "BBCA.JK"],
+                    "tasks": [{
+                        "tool": "compare_peer_metrics",
+                        "purpose": "Compare the requested banks.",
+                        "arguments": {"tickers": ["BBRI.JK", "BBCA.JK"]},
+                    }],
+                }
+
+        mock = PlanMock()
+        result = ResearchOrchestrator(
+            InMemoryProvider(), synthesizer=LLMResearchSynthesizer(mock)
+        ).run("Differences between BBRI and BBCA")
+
+        self.assertEqual(result.plan.intent, "COMPARE")
+        self.assertEqual(result.plan.tickers, ("BBRI.JK", "BBCA.JK"))
+        self.assertEqual(result.synthesis.generation_mode, "template")
+        self.assertEqual(mock.calls, 2)  # one plan proposal; synthesis response rejected safely
+
+    def test_llm_planner_cannot_add_unknown_tools(self):
+        class UnsafePlanMock:
+            def complete_json(self, system_prompt, user_prompt):
+                return {
+                    "intent": "COMPARE",
+                    "tickers": ["BBRI.JK", "BBCA.JK"],
+                    "tasks": [{
+                        "tool": "run_shell",
+                        "purpose": "unsafe",
+                        "arguments": {},
+                    }],
+                }
+
+        orchestrator = ResearchOrchestrator(
+            InMemoryProvider(), synthesizer=LLMResearchSynthesizer(UnsafePlanMock())
+        )
+        with self.assertRaises(UnsupportedIntentError):
+            orchestrator.run("Differences between BBRI and BBCA")
+
+    def test_session_memory_resolves_followup_against_investigated_change(self):
+        provider = InMemoryProvider()
+        memory = ResearchSessionMemory()
+        orchestrator = ResearchOrchestrator(provider, session_memory=memory)
+
+        investigation = orchestrator.run("Investigate BBRI")
+        comparison = orchestrator.run("Compare this change with BBCA and BMRI")
+
+        self.assertEqual(investigation.plan.intent, "INVESTIGATE")
+        self.assertEqual(comparison.plan.intent, "COMPARE")
+        self.assertEqual(comparison.plan.tickers, ("BBRI.JK", "BBCA.JK", "BMRI.JK"))
+        self.assertEqual(comparison.plan.tasks[0].arguments["metric"], "revenue")
+        self.assertEqual(comparison.outputs["compare_peer_metrics"].value["metric"], "revenue")
+        self.assertTrue(all(
+            item.metric == "revenue" for item in comparison.evidence_ledger
+        ))
+        self.assertEqual(memory.active_ticker, "BBRI.JK")
+        self.assertEqual(memory.active_sector, "Banks")
+        self.assertEqual(memory.last_investigation_objective, "Investigate BBRI")
+        self.assertEqual(memory.last_anomaly_metric, "revenue")
+        self.assertEqual(memory.selected_peers, ["BBCA.JK", "BMRI.JK"])
+        self.assertEqual(memory.evidence_ids, [item.evidence_id for item in comparison.evidence_ledger])
+        self.assertEqual(memory.previous_plan, comparison.plan.to_dict())
+
+    def test_session_memory_is_reused_from_session_state(self):
+        session_state = {}
+        first = ResearchSessionMemory.from_session_state(session_state)
+        first.active_ticker = "BBRI.JK"
+
+        second = ResearchSessionMemory.from_session_state(session_state)
+
+        self.assertIs(first, second)
+        self.assertEqual(second.active_ticker, "BBRI.JK")
+        self.assertEqual(set(first.to_dict()), {
+            "active_ticker",
+            "active_sector",
+            "last_investigation_objective",
+            "last_anomaly_metric",
+            "selected_peers",
+            "evidence_ids",
+            "previous_plan",
+        })
+
+    def test_registry_is_explicit_and_does_not_evaluate_tool_names(self):
+        registry = ToolRegistry()
+        with self.assertRaises(UnsupportedToolError):
+            registry.get("__import__('os').system('whoami')")
+
+
+if __name__ == "__main__":
+    unittest.main()
