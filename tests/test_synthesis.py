@@ -15,7 +15,7 @@ def sample_ledger():
     return EvidenceLedger([
         Evidence(
             evidence_id="ev-001",
-            ticker="BBRI.JK",
+            ticker="DEMOBANK1",
             company_name="Sample Bank",
             metric="revenue",
             current_value=120,
@@ -37,7 +37,7 @@ def sample_ledger():
 class MockLLMProvider:
     def __init__(self, response=None):
         self.response = response or {
-            "executive_summary": "BBRI.JK revenue changed by 20% [ev-001].",
+            "executive_summary": "DEMOBANK1 revenue changed by 20% [ev-001].",
             "key_findings": ["The observed change was 20% [ev-001]."],
             "historical_context": ["2024 to 2025 [ev-001]."],
             "peer_comparison": ["Peer median change was 5% [ev-001]."],
@@ -55,7 +55,7 @@ class MockLLMProvider:
 class SynthesisTests(unittest.TestCase):
     def test_no_provider_generates_deterministic_evidence_cited_summary(self):
         result = LLMResearchSynthesizer().synthesize(
-            "Investigate BBRI", {"intent": "INVESTIGATE"}, sample_ledger()
+            "Investigate DEMOBANK1", {"intent": "INVESTIGATE"}, sample_ledger()
         )
 
         self.assertIsInstance(result, ResearchSynthesis)
@@ -67,7 +67,7 @@ class SynthesisTests(unittest.TestCase):
     def test_mock_provider_synthesizes_with_required_safety_prompt(self):
         provider = MockLLMProvider()
         result = LLMResearchSynthesizer(provider).synthesize(
-            "Investigate BBRI", {"intent": "INVESTIGATE"}, sample_ledger()
+            "Investigate DEMOBANK1", {"intent": "INVESTIGATE"}, sample_ledger()
         )
 
         self.assertEqual(result.generation_mode, "llm")
@@ -78,11 +78,11 @@ class SynthesisTests(unittest.TestCase):
 
     def test_unreferenced_or_novel_numeric_claim_falls_back_to_template(self):
         response = MockLLMProvider().response
-        response["executive_summary"] = "BBRI revenue is 999% [ev-001]."
+        response["executive_summary"] = "DEMOBANK1 revenue is 999% [ev-001]."
         provider = MockLLMProvider(response)
 
         result = LLMResearchSynthesizer(provider).synthesize(
-            "Investigate BBRI", {"intent": "INVESTIGATE"}, sample_ledger()
+            "Investigate DEMOBANK1", {"intent": "INVESTIGATE"}, sample_ledger()
         )
 
         self.assertEqual(result.generation_mode, "template")
@@ -92,7 +92,7 @@ class SynthesisTests(unittest.TestCase):
         response = MockLLMProvider().response
         response["evidence_references"] = ["made-up-id"]
         result = LLMResearchSynthesizer(MockLLMProvider(response)).synthesize(
-            "Investigate BBRI", {"intent": "INVESTIGATE"}, sample_ledger()
+            "Investigate DEMOBANK1", {"intent": "INVESTIGATE"}, sample_ledger()
         )
         self.assertEqual(result.generation_mode, "template")
 

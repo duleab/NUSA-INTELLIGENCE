@@ -139,7 +139,7 @@ class FixtureBankDataProvider:
         self._data_mode = data_mode
         mode = "demo" if data_mode == "synthetic" else "fixture"
         warning = (
-            "DEMO/SAMPLE synthetic values; not live or current Sectors data."
+            "DEMO/SAMPLE DATA — Synthetic demonstration values. Not current market data."
             if data_mode == "synthetic"
             else "Fixture snapshot; not live or necessarily current Sectors data."
         )

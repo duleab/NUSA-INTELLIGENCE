@@ -13,8 +13,8 @@ class BankUniverseTests(unittest.TestCase):
         payload = {
             "results": [
                 {
-                    "symbol": "bbri",
-                    "company_name": "Bank Rakyat Indonesia",
+                    "symbol": "demobank1",
+                    "company_name": "Archipelago Sample Bank",
                     "query_values": {"revenue[2024]": 100, "revenue[2023]": 80},
                 }
             ],
@@ -24,8 +24,8 @@ class BankUniverseTests(unittest.TestCase):
         universe = normalize_bank_universe(payload)
 
         self.assertIsInstance(universe, BankUniverse)
-        self.assertEqual(universe.frame.loc[0, "ticker"], "BBRI")
-        self.assertEqual(universe.frame.loc[0, "company_name"], "Bank Rakyat Indonesia")
+        self.assertEqual(universe.frame.loc[0, "ticker"], "DEMOBANK1")
+        self.assertEqual(universe.frame.loc[0, "company_name"], "Archipelago Sample Bank")
         self.assertEqual(universe.frame.loc[0, "revenue[2024]"], 100)
         self.assertEqual(universe.frame.loc[0, "revenue[2023]"], 80)
 
@@ -36,9 +36,9 @@ class BankUniverseTests(unittest.TestCase):
 
     def test_query_values_cannot_overwrite_company_identity(self):
         universe = normalize_bank_universe(
-            {"results": [{"symbol": "BBCA", "query_values": {"ticker": "FAKE"}}]}
+            {"results": [{"symbol": "DEMOBANK1", "query_values": {"ticker": "FAKE"}}]}
         )
-        self.assertEqual(universe.frame.loc[0, "ticker"], "BBCA")
+        self.assertEqual(universe.frame.loc[0, "ticker"], "DEMOBANK1")
 
     def test_rejects_unexpected_screener_shape(self):
         with self.assertRaises(ValueError):
@@ -51,23 +51,23 @@ class AnomalyTests(unittest.TestCase):
         frame = pd.DataFrame(
             [
                 {
-                    "ticker": "BBCA", "company_name": "A", "revenue[2024]": 110,
+                    "ticker": "DEMOBANK1", "company_name": "A", "revenue[2024]": 110,
                     "revenue[2023]": 100, "eps[2024]": 11, "eps[2023]": 10,
                 },
                 {
-                    "ticker": "BBRI", "company_name": "B", "revenue[2024]": 108,
+                    "ticker": "DEMOBANK2", "company_name": "B", "revenue[2024]": 108,
                     "revenue[2023]": 100, "eps[2024]": 10.8, "eps[2023]": 10,
                 },
                 {
-                    "ticker": "BMRI", "company_name": "C", "revenue[2024]": 112,
+                    "ticker": "DEMOBANK3", "company_name": "C", "revenue[2024]": 112,
                     "revenue[2023]": 100, "eps[2024]": 11.2, "eps[2023]": 10,
                 },
                 {
-                    "ticker": "BBNI", "company_name": "D", "revenue[2024]": 105,
+                    "ticker": "DEMOBANK4", "company_name": "D", "revenue[2024]": 105,
                     "revenue[2023]": 100, "eps[2024]": 10.5, "eps[2023]": 10,
                 },
                 {
-                    "ticker": "BRIS", "company_name": "E", "revenue[2024]": 200,
+                    "ticker": "DEMOBANK5", "company_name": "E", "revenue[2024]": 200,
                     "revenue[2023]": 100, "eps[2024]": 20, "eps[2023]": 10,
                 },
             ]
@@ -75,7 +75,7 @@ class AnomalyTests(unittest.TestCase):
 
         ranked = rank_anomalies(frame)
 
-        self.assertEqual(ranked.iloc[0]["ticker"], "BRIS")
+        self.assertEqual(ranked.iloc[0]["ticker"], "DEMOBANK5")
         self.assertGreaterEqual(ranked.iloc[0]["score"], 0)
         self.assertLessEqual(ranked.iloc[0]["score"], 100)
         self.assertTrue(ranked.iloc[0]["components"])
@@ -83,7 +83,7 @@ class AnomalyTests(unittest.TestCase):
 
     def test_abstains_when_peer_or_history_coverage_is_insufficient(self):
         frame = pd.DataFrame(
-            [{"ticker": "BBCA", "revenue[2024]": 100, "revenue[2023]": 50}]
+            [{"ticker": "DEMOBANK1", "revenue[2024]": 100, "revenue[2023]": 50}]
         )
 
         ranked = rank_anomalies(frame)
@@ -107,8 +107,8 @@ class AnomalyTests(unittest.TestCase):
             "results": [
                 {"symbol": symbol, "query_values": {"revenue[2024]": latest, "revenue[2023]": 100}}
                 for symbol, latest in [
-                    ("BBCA", 110), ("BBRI", 108), ("BMRI", 112),
-                    ("BBNI", 105), ("BRIS", 200),
+                    ("DEMOBANK1", 110), ("DEMOBANK2", 108), ("DEMOBANK3", 112),
+                    ("DEMOBANK4", 105), ("DEMOBANK5", 200),
                 ]
             ]
         }
@@ -121,7 +121,7 @@ class AnomalyTests(unittest.TestCase):
         result = discover_banks(provider)
 
         self.assertEqual(len(result.universe.frame), 5)
-        self.assertEqual(result.ranked.iloc[0]["ticker"], "BRIS")
+        self.assertEqual(result.ranked.iloc[0]["ticker"], "DEMOBANK5")
         self.assertFalse(result.status.is_live)
 
 

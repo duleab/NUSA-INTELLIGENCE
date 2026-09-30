@@ -16,8 +16,8 @@ from nusa.providers.sectors import FixtureBankDataProvider
 class EvidenceLedgerTests(unittest.TestCase):
     def make_evidence(self, **overrides):
         values = {
-            "ticker": "BBRI",
-            "company_name": "Bank Rakyat Indonesia",
+            "ticker": "DEMOBANK1",
+            "company_name": "Archipelago Sample Bank",
             "metric": "revenue",
             "current_value": 120.0,
             "previous_value": 100.0,
@@ -40,7 +40,7 @@ class EvidenceLedgerTests(unittest.TestCase):
         item = self.make_evidence()
         ledger.add(item)
 
-        self.assertEqual(ledger.by_ticker("bbri"), [item])
+        self.assertEqual(ledger.by_ticker("demobank1"), [item])
         self.assertEqual(ledger.by_metric("REVENUE"), [item])
 
     def test_validator_reports_missing_required_fields_and_source(self):
@@ -69,9 +69,9 @@ class EvidenceLedgerTests(unittest.TestCase):
         self.assertIn("previous_value is required", errors)
 
     def test_validator_checks_ticker_consistency(self):
-        errors = EvidenceValidator().validate(self.make_evidence(), expected_ticker="BBCA")
+        errors = EvidenceValidator().validate(self.make_evidence(), expected_ticker="DEMOBANK2")
 
-        self.assertIn("ticker does not match expected ticker BBCA", errors)
+        self.assertIn("ticker does not match expected ticker DEMOBANK2", errors)
 
     def test_validator_rejects_incompatible_annual_periods(self):
         errors = EvidenceValidator().validate(self.make_evidence(period="2022 to 2025"))
@@ -92,7 +92,7 @@ class EvidenceLedgerTests(unittest.TestCase):
         )
         self.assertEqual(
             validator.validate_conclusion(
-                "Revenue accelerated", [self.make_evidence()], expected_ticker="BBRI"
+                "Revenue accelerated", [self.make_evidence()], expected_ticker="DEMOBANK1"
             ),
             [],
         )
@@ -100,7 +100,7 @@ class EvidenceLedgerTests(unittest.TestCase):
     def test_compact_llm_context_is_structured_and_serializable(self):
         ledger = EvidenceLedger([self.make_evidence()])
 
-        context = ledger.to_llm_context(ticker="BBRI")
+        context = ledger.to_llm_context(ticker="DEMOBANK1")
 
         self.assertEqual(context["evidence"][0]["metric"], "revenue")
         self.assertEqual(context["evidence"][0]["current_value"], 120.0)

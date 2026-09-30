@@ -1,27 +1,28 @@
 # NUSA Intelligence
 
-**AI research agent for unusual financial changes in Indonesian listed banks.**
+**Autonomous AI research agent for unusual financial changes in Indonesian listed companies.**
 
-NUSA is a Track 01 prototype built around bounded bank discovery, deterministic
-financial analysis, source-backed evidence, and a custom tool-routed research
-agent. The interface defaults to clearly labeled DEMO/SAMPLE data. Direct live
-Companies Screener access remains unresolved; see [Limitations](#limitations).
+The current MVP focuses on Indonesian-listed banks. NUSA combines deterministic
+quantitative analysis with custom AI-agent orchestration and an evidence ledger.
+The judging journey uses visibly labeled synthetic DEMO/SAMPLE data. Direct
+application access to Sectors' Companies Screener remains unresolved; see
+[Known Limitations](#known-limitations).
 
 ## Problem
 
-Analysts need to find unusual changes across a relevant peer group, investigate
-the underlying financial metrics, and understand why a company was flagged.
-Manually screening companies and reconciling periods, peer baselines, and source
-records is slow. A fluent AI summary without verifiable evidence can also make
-unsupported financial claims.
+Analysts have access to large amounts of financial data, but identifying which
+companies deserve investigation and why requires repetitive screening,
+historical analysis, and peer comparison. A fluent AI summary without
+verifiable evidence can also make unsupported financial claims.
 
 ## Solution
 
-NUSA provides an IDX banking research workflow that ranks unusual annual
-financial changes where adequate data is available, investigates a selected
-company, compares the selected metric with peers, and presents its evidence and
-limitations. Deterministic Python analytics calculate the numbers; the optional
-LLM only helps interpret unresolved wording and explain validated evidence.
+NUSA combines a live-capable Sectors data-provider integration, deterministic
+quantitative analytics, and custom AI-agent orchestration to discover unusual
+financial changes and investigate them. Python calculates the metrics; the
+optional LLM helps resolve unsupported request wording and synthesize validated
+evidence. When the live Screener is unavailable, the demo uses an explicit
+synthetic fixture, never a silent live-to-demo substitution.
 
 ## Why NUSA
 
@@ -34,42 +35,58 @@ LLM only helps interpret unresolved wording and explain validated evidence.
 - Missing coverage stays missing. Demo data is visibly labeled and is never
   presented as current Sectors market data.
 
-## Track 01 Fit
+## Track 01 Qualification
 
-NUSA targets **AI Agents & Assistants (Track 01)**. Its agent has bounded intent
-resolution, structured planning, an explicit safe-tool registry/router,
-deterministic analysis, evidence validation, session-level structured memory,
-and an optional LLM synthesis layer. The model does not execute generated code
-or originate financial values. A deterministic report template remains
-available when no LLM provider is configured.
+NUSA is **not simply an LLM connected to Sectors**. It implements custom intent
+resolution, research planning, registered tool routing, deterministic
+analytics, anomaly scoring, an Evidence Ledger, evidence validation, optional
+LLM synthesis, and structured session memory. Python controls data retrieval,
+calculations, validation, and tool execution. The LLM does not originate
+financial values or execute generated code. A deterministic report template
+works without an LLM credential.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    Analyst --> UI[Streamlit interface]
+    Analyst --> UI[Streamlit: Discover / Investigate / Methodology]
     UI --> Agent[Research orchestrator]
-    Memory[Session research memory] <--> Agent
-    Agent --> Discover[Discover]
-    Discover --> Plan[Plan]
-    Plan --> Retrieve[Retrieve]
-    Retrieve --> Provider[BankDataProvider]
-    Provider --> Sectors[Sectors API]
-    Provider --> Fixture[Explicit DEMO/SAMPLE fixture]
-    Retrieve --> Analyze[Analyze]
-    Analyze --> Engine[Deterministic anomaly engine]
-    Engine --> Compare[Compare]
-    Compare --> Verify[Evidence ledger and validator]
-    Verify --> Explain[LLM synthesizer or deterministic template]
-    Explain --> Report[Evidence-cited research report]
+    Agent --> Intent[Intent resolver + planner]
+    Intent --> Router[Validated plan + registered tool router]
+    Router --> Provider[BankDataProvider]
+    Provider --> Sectors[Sectors API: LIVE]
+    Provider --> Fixture[DEMO/SAMPLE: synthetic fixture]
+    Provider --> Analytics[Deterministic analytics]
+    Analytics --> Ledger[Evidence Ledger + validator]
+    Ledger --> Synthesis[Optional LLM synthesis]
+    Ledger --> Template[Deterministic template fallback]
+    Synthesis --> Report[Research report]
+    Template --> Report
+    Report --> Memory[Structured session memory]
+    Memory --> Agent
 ```
 
 The product flow is:
 
-**Discover → Plan → Retrieve → Analyze → Compare → Verify → Explain**
+**Discover → Plan → Retrieve → Analyze → Compare → Verify → Explain → Remember**
 
-The same provider and analytics interfaces are used by the orchestration layer;
-the UI does not duplicate financial calculations.
+The interface calls the existing provider and orchestrator; it does not
+duplicate financial calculations. Operational trace events are visible without
+exposing hidden chain-of-thought.
+
+## Core Workflow
+
+- **Discover:** rank eligible unusual annual metric changes in a bounded bank
+  universe.
+- **Plan:** resolve DISCOVER, INVESTIGATE, or COMPARE and validate a structured
+  plan against registered tools.
+- **Retrieve:** use the selected provider; live errors propagate, and fixture
+  data is used only when DEMO/SAMPLE is explicitly selected.
+- **Analyze / Compare:** compute deterministic changes and same-universe peer
+  baselines where the data supports them.
+- **Verify:** require source-backed, period-aligned evidence before synthesis.
+- **Explain / Remember:** produce an evidence-grounded report and store only
+  small structured context for an in-session follow-up.
 
 ## Custom Agent Orchestration
 
@@ -99,28 +116,32 @@ data on an API error. The app also supports the taxonomy endpoint
 API credentials are read from the environment or ignored `.env`, never shown in
 the interface or committed.
 
-**Current integration status:** `/v2/subsectors/` has returned authenticated
-data. The official Sectors Playground was reported to return a 48-company Banks
-universe, including BBCA.JK, BBRI.JK, and BMRI.JK. However, the direct Python
-Companies Screener request still returns **HTTP 403**. The latest MVP check
-made one bounded request with retries disabled and received 403 again. The
-direct integration cause remains unresolved; Playground success does not prove
-that the application client can retrieve those rows.
+**Current integration status:** authenticated `/v2/subsectors/` access was
+confirmed. The official Sectors Companies Screener Playground was reported to
+return the IDX Banks universe (48 companies). That Playground result is not an
+application response. Direct application `GET /v2/companies/` currently returns
+**HTTP 403**, and the cause remains unresolved. The application retains the
+LIVE provider architecture and propagates this error without switching to
+DEMO/SAMPLE. Consequently the submission journey uses the explicitly labeled
+synthetic fixture; its values are **not current market data**. See
+[`docs/sectors_api_analysis.md`](docs/sectors_api_analysis.md) for the API
+investigation.
 
-## Discovery Methodology
+## Methodology
 
 The anomaly engine only considers annual metric pairs actually present in its
-input. For each eligible metric it calculates the year-over-year percentage
-change, compares the company against the median change of its other comparable
-banks, and ranks absolute deviations by cross-sectional percentile. It withholds
-a score unless at least four companies (the subject plus three peers) have
-comparable values. The score is a **research-priority rank**, not a prediction,
-investment rating, fraud signal, or causal claim.
+input. For each eligible metric it calculates year-over-year percentage
+change, compares a bank against the median change of its other comparable
+banks, and ranks absolute deviations by cross-sectional percentile. It
+withholds a score unless at least four companies (the subject plus three peers)
+have comparable values. The score indicates **research priority**; it is not a
+prediction, investment rating, fraud signal, or causal claim.
 
 Annual fields requested from the Screener are documented candidates, not
-confirmed live coverage. Because the direct Screener response is currently
-blocked, real bank rankings cannot be claimed from this environment. The
-bundled fixture contains fictional `DEMO…` tickers and synthetic values.
+confirmed live coverage. The bundled fixture contains five fictional
+`DEMOBANK1`–`DEMOBANK5` companies with synthetic 2022–2025 revenue, earnings,
+assets, equity, ROA, and ROE values in demonstration units. These values are
+not Sectors data and do not describe real companies.
 
 ## Evidence Grounding
 
@@ -136,9 +157,9 @@ claims fall back to a deterministic evidence-based summary.
 
 ## Screenshots
 
-No screenshots are committed yet. Before submission, add captures of the
-DISCOVER, INVESTIGATE, and METHODOLOGY sections. Any DEMO/SAMPLE capture must
-retain its prominent non-live warning; never include API keys or other secrets.
+Screenshots are to be captured manually; none are claimed as included yet. See
+[`docs/screenshots.md`](docs/screenshots.md) for the shot list, crop guidance,
+and captions. Every sample-data screenshot must retain its prominent warning.
 
 ## Installation
 
@@ -184,28 +205,41 @@ Run the test suite with:
 python -m unittest discover -s tests -v
 ```
 
-## Demo Workflow
+## Tests
 
-1. Keep the source selector on **DEMO/SAMPLE** and confirm the non-live warning.
-2. In **DISCOVER**, select **Analyze Banks** to show the fixture’s clearly
-   labeled research-priority ranking.
-3. Select a sample company and choose **Investigate selected bank** or open
-   **INVESTIGATE**, load/select a sample company, and run the investigation.
-4. Review the operational progress, research plan, charts, peer baseline,
-   evidence ledger, report, and limitations.
-5. Open **METHODOLOGY** for the scoring, evidence, agent, and disclaimer notes.
+The repository's current full suite contains 59 tests. Run the command above
+from the project root before recording or submitting.
 
-The bundled fixture uses fictional `DEMO…` symbols, not BBRI/BBCA/BMRI. Do not
-describe its synthetic values as real Indonesian bank data.
+## Demo Mode
 
-## Limitations
+1. Keep the source selector on **DEMO/SAMPLE** and confirm the warning:
+   **Synthetic demonstration values. Not current market data.**
+2. In **DISCOVER**, click **Example: Find unusual financial changes among
+   Indonesian banks**; this runs Discovery (or click **Analyze Banks**).
+3. Click **Investigate highest-ranked demo bank** to preselect `DEMOBANK5`.
+   Open **INVESTIGATE** and click **Run investigation** to see the plan, tools,
+   deterministic analysis, evidence validation, and report.
+4. Click the example prompt **Compare this change with DEMOBANK2 and DEMOBANK3**
+   and then **Run follow-up peer comparison**. Session memory resolves “this
+   change” to the investigation's primary-driver metric and compares the three
+   fictional banks using fixture evidence.
+5. Open **METHODOLOGY** for scoring, evidence, agent, and disclaimer details.
+
+The bundled fixture contains five fictional `DEMOBANK1`–`DEMOBANK5` symbols and
+synthetic annual values for 2022–2025 (revenue, earnings, assets, equity, ROA,
+and ROE). Its numeric values are demonstration data, not current market values
+or Sectors data. `DEMOBANK5` is configured as an intentionally unusual sample
+for the guided Discovery → Investigate → peer comparison journey.
+
+## Known Limitations
 
 - Direct live `GET /v2/companies/` access from the Python client remains HTTP
   403, despite the reported successful Playground query. Live Discover,
   Investigate, and Compare therefore remain unverified end to end.
-- The bundled DEMO/SAMPLE fixture is small, fictional, and contains only a
-  limited annual revenue series. It cannot demonstrate the exact BBRI/BBCA/BMRI
-  live-data journeys.
+- The bundled DEMO/SAMPLE fixture is small, fictional, and uses synthetic
+  2022–2025 demonstration values. It demonstrates the orchestration workflow
+  but cannot demonstrate real BBRI/BBCA/BMRI financial data or a live-market
+  conclusion.
 - Historical financial coverage and available metrics depend on the provider
   response. The application abstains when required peer/history evidence is
   insufficient.
@@ -215,7 +249,7 @@ describe its synthetic values as real Indonesian bank data.
 - The app does not establish causality, detect fraud, trade securities, or
   provide full-market or long-horizon technical surveillance.
 
-## Disclaimer
+## Safety / Research Disclaimer
 
 NUSA is a research prototype. An unusual financial change is a prompt for
 further investigation, not evidence of misconduct or fraud. NUSA does not issue
@@ -224,9 +258,10 @@ source, period, coverage, and context independently before making decisions.
 
 ## Team
 
-Team member names and roles were not supplied in this repository. Add the
-confirmed team names and roles here before submitting; do not submit this
-placeholder as final team information.
+**Team:** NUSA Intelligence
+
+**Participation:** Solo participant
+**Track:** Track 01 — AI Agents & Assistants
 
 ## Hackathon
 
@@ -235,4 +270,5 @@ placeholder as final team information.
 - **MVP scope:** IDX Banking
 - **Submission deadline:** September 30, 2026 at 23:59 WIB
 - **Submission readiness:** local repository prepared; live Companies Screener
-  access and team details remain outstanding.
+  access remains outstanding. Screenshots and video links must be added after
+  manual capture/recording.

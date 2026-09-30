@@ -26,11 +26,11 @@ def playground_payload():
                 },
             }
             for ticker, value in [
-                ("DEMO001", 110),
-                ("DEMO002", 108),
-                ("DEMO003", 112),
-                ("DEMO004", 105),
-                ("DEMO005", 200),
+                ("DEMOBANK1", 110),
+                ("DEMOBANK2", 108),
+                ("DEMOBANK3", 112),
+                ("DEMOBANK4", 105),
+                ("DEMOBANK5", 200),
             ]
         ],
         "pagination": {"total_count": 5, "showing": 5, "limit": 50},
@@ -90,12 +90,30 @@ class ProviderTests(unittest.TestCase):
 
         self.assertFalse(universe_result.status.is_live)
         self.assertIn("DEMO/SAMPLE", universe_result.status.source)
-        self.assertIn("not live", universe_result.status.warning.lower())
+        self.assertIn("not current market data", universe_result.status.warning.lower())
         self.assertTrue(all(ticker.startswith("DEMO") for ticker in universe_result.universe.frame["ticker"]))
         self.assertTrue(all(e.data_mode == "synthetic" for e in discovery.evidence_ledger))
         self.assertTrue(all(e.source == universe_result.status.source for e in discovery.evidence_ledger))
         self.assertTrue(all(e.source_endpoint == "fixture://local" for e in discovery.evidence_ledger))
         self.assertEqual(discovery.status.mode, "demo")
+
+    def test_bundled_demo_has_multiyear_fictional_banks_and_a_clear_top_candidate(self):
+        provider = create_bank_data_provider("demo")
+        discovery = provider.get_discovery_data()
+
+        self.assertEqual(
+            set(discovery.universe.frame["ticker"]),
+            {"DEMOBANK1", "DEMOBANK2", "DEMOBANK3", "DEMOBANK4", "DEMOBANK5"},
+        )
+        self.assertTrue(all(ticker not in {"BBCA", "BBRI", "BMRI", "BBNI"} for ticker in discovery.universe.frame["ticker"]))
+        for metric in ("revenue", "earnings", "assets", "equity", "roa", "roe"):
+            annual_columns = {f"{metric}[{year}]" for year in range(2022, 2026)}
+            self.assertTrue(annual_columns.issubset(discovery.universe.frame.columns))
+            self.assertTrue(discovery.universe.frame[list(annual_columns)].notna().all().all())
+        self.assertGreaterEqual(len(discovery.ranked), 5)
+        self.assertEqual(discovery.ranked.iloc[0]["ticker"], "DEMOBANK5")
+        self.assertTrue(discovery.evidence_ledger.by_ticker("DEMOBANK5"))
+        self.assertTrue(all(item.data_mode == "synthetic" for item in discovery.evidence_ledger))
 
     def test_external_fixture_requires_explicit_label_and_loads_playground_shape(self):
         payload = playground_payload()
@@ -111,7 +129,7 @@ class ProviderTests(unittest.TestCase):
             result = provider.get_bank_universe()
             discovery = provider.get_discovery_data()
 
-        self.assertEqual(result.universe.frame.loc[0, "ticker"], "DEMO001")
+        self.assertEqual(result.universe.frame.loc[0, "ticker"], "DEMOBANK1")
         self.assertEqual(result.status.source, "Sectors Playground capture, 2026-09-29")
         self.assertFalse(result.status.is_live)
         self.assertEqual(result.status.mode, "fixture")
@@ -140,10 +158,10 @@ class ProviderTests(unittest.TestCase):
     def test_fixture_company_data_keeps_source_status_and_non_live_warning(self):
         provider = create_bank_data_provider("demo")
 
-        company = provider.get_company_data("DEMO001")
+        company = provider.get_company_data("DEMOBANK1")
 
         self.assertIsInstance(company, CompanyData)
-        self.assertEqual(company.ticker, "DEMO001")
+        self.assertEqual(company.ticker, "DEMOBANK1")
         self.assertFalse(company.status.is_live)
         self.assertIn("DEMO/SAMPLE", company.status.source)
 

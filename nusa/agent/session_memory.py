@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, ClassVar, MutableMapping
 
 
-_TICKER_RE = re.compile(r"(?<![A-Z0-9])([A-Z0-9]{3,8}(?:\.JK)?)(?![A-Z0-9])", re.I)
+_TICKER_RE = re.compile(r"(?<![A-Z0-9])([A-Z0-9]{3,20}(?:\.JK)?)(?![A-Z0-9])", re.I)
 _FOLLOWUP_RE = re.compile(r"\bthis\s+change\b", re.I)
 _TICKER_STOPWORDS = {
     "AND", "OR", "THE", "WITH", "PEER", "PEERS", "BANK", "BANKS", "IDX",

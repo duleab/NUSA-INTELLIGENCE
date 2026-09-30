@@ -1,11 +1,71 @@
 {
-  "fixture_notice": "DEMO/SAMPLE synthetic development data. Fictional tickers and fictional values; not current Sectors data.",
+  "fixture_notice": "DEMO/SAMPLE DATA. Synthetic demonstration values in arbitrary sample units (ratio fields are synthetic percentages). Fictional tickers and fictional values; not current market data and not Sectors data.",
   "results": [
-    {"symbol": "DEMO001", "company_name": "SAMPLE BANK ALPHA", "query_values": {"sub_sector": "Banks", "revenue[2024]": 100, "revenue[2025]": 110}},
-    {"symbol": "DEMO002", "company_name": "SAMPLE BANK BRAVO", "query_values": {"sub_sector": "Banks", "revenue[2024]": 100, "revenue[2025]": 108}},
-    {"symbol": "DEMO003", "company_name": "SAMPLE BANK CHARLIE", "query_values": {"sub_sector": "Banks", "revenue[2024]": 100, "revenue[2025]": 112}},
-    {"symbol": "DEMO004", "company_name": "SAMPLE BANK DELTA", "query_values": {"sub_sector": "Banks", "revenue[2024]": 100, "revenue[2025]": 105}},
-    {"symbol": "DEMO005", "company_name": "SAMPLE BANK ECHO", "query_values": {"sub_sector": "Banks", "revenue[2024]": 100, "revenue[2025]": 200}}
+    {
+      "symbol": "DEMOBANK1",
+      "company_name": "Archipelago Sample Bank",
+      "query_values": {
+        "sub_sector": "Banks",
+        "revenue[2022]": 80, "revenue[2023]": 84, "revenue[2024]": 89, "revenue[2025]": 94,
+        "earnings[2022]": 8, "earnings[2023]": 8.4, "earnings[2024]": 8.9, "earnings[2025]": 9.4,
+        "assets[2022]": 700, "assets[2023]": 725, "assets[2024]": 750, "assets[2025]": 780,
+        "equity[2022]": 70, "equity[2023]": 73, "equity[2024]": 75, "equity[2025]": 78,
+        "roa[2022]": 1.0, "roa[2023]": 1.1, "roa[2024]": 1.1, "roa[2025]": 1.2,
+        "roe[2022]": 10, "roe[2023]": 10.8, "roe[2024]": 11.2, "roe[2025]": 12
+      }
+    },
+    {
+      "symbol": "DEMOBANK2",
+      "company_name": "Banyan Sample Bank",
+      "query_values": {
+        "sub_sector": "Banks",
+        "revenue[2022]": 82, "revenue[2023]": 86, "revenue[2024]": 91, "revenue[2025]": 96,
+        "earnings[2022]": 8.2, "earnings[2023]": 8.6, "earnings[2024]": 9.1, "earnings[2025]": 9.6,
+        "assets[2022]": 720, "assets[2023]": 745, "assets[2024]": 775, "assets[2025]": 805,
+        "equity[2022]": 72, "equity[2023]": 75, "equity[2024]": 78, "equity[2025]": 81,
+        "roa[2022]": 1.0, "roa[2023]": 1.1, "roa[2024]": 1.2, "roa[2025]": 1.2,
+        "roe[2022]": 10, "roe[2023]": 10.7, "roe[2024]": 11.4, "roe[2025]": 12.1
+      }
+    },
+    {
+      "symbol": "DEMOBANK3",
+      "company_name": "Cendana Sample Bank",
+      "query_values": {
+        "sub_sector": "Banks",
+        "revenue[2022]": 78, "revenue[2023]": 82, "revenue[2024]": 87, "revenue[2025]": 92,
+        "earnings[2022]": 7.8, "earnings[2023]": 8.2, "earnings[2024]": 8.7, "earnings[2025]": 9.2,
+        "assets[2022]": 680, "assets[2023]": 710, "assets[2024]": 740, "assets[2025]": 770,
+        "equity[2022]": 68, "equity[2023]": 71, "equity[2024]": 74, "equity[2025]": 77,
+        "roa[2022]": 1.0, "roa[2023]": 1.1, "roa[2024]": 1.2, "roa[2025]": 1.2,
+        "roe[2022]": 10, "roe[2023]": 10.6, "roe[2024]": 11.5, "roe[2025]": 12.2
+      }
+    },
+    {
+      "symbol": "DEMOBANK4",
+      "company_name": "Damar Sample Bank",
+      "query_values": {
+        "sub_sector": "Banks",
+        "revenue[2022]": 84, "revenue[2023]": 88, "revenue[2024]": 93, "revenue[2025]": 98,
+        "earnings[2022]": 8.4, "earnings[2023]": 8.8, "earnings[2024]": 9.3, "earnings[2025]": 9.8,
+        "assets[2022]": 750, "assets[2023]": 780, "assets[2024]": 810, "assets[2025]": 845,
+        "equity[2022]": 75, "equity[2023]": 78, "equity[2024]": 81, "equity[2025]": 85,
+        "roa[2022]": 1.1, "roa[2023]": 1.1, "roa[2024]": 1.2, "roa[2025]": 1.2,
+        "roe[2022]": 10, "roe[2023]": 10.8, "roe[2024]": 11.3, "roe[2025]": 12.0
+      }
+    },
+    {
+      "symbol": "DEMOBANK5",
+      "company_name": "Merapi Sample Bank",
+      "query_values": {
+        "sub_sector": "Banks",
+        "revenue[2022]": 90, "revenue[2023]": 95, "revenue[2024]": 100, "revenue[2025]": 180,
+        "earnings[2022]": 9, "earnings[2023]": 10, "earnings[2024]": 11, "earnings[2025]": 30,
+        "assets[2022]": 820, "assets[2023]": 850, "assets[2024]": 880, "assets[2025]": 1100,
+        "equity[2022]": 82, "equity[2023]": 85, "equity[2024]": 88, "equity[2025]": 110,
+        "roa[2022]": 1.0, "roa[2023]": 1.1, "roa[2024]": 1.2, "roa[2025]": 2.7,
+        "roe[2022]": 10, "roe[2023]": 11, "roe[2024]": 12, "roe[2025]": 27
+      }
+    }
   ],
   "pagination": {"total_count": 5, "showing": 5, "limit": 5, "offset": 0}
 }

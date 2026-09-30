@@ -17,7 +17,7 @@ from nusa.agent.session_memory import ResearchSessionMemory
 from nusa.providers.base import BankDataProvider, DataSourceStatus
 
 
-_TICKER_PATTERN = re.compile(r"(?<![A-Z0-9])([A-Z0-9]{3,8}(?:\.JK)?)(?![A-Z0-9])", re.IGNORECASE)
+_TICKER_PATTERN = re.compile(r"(?<![A-Z0-9])([A-Z0-9]{3,20}(?:\.JK)?)(?![A-Z0-9])", re.IGNORECASE)
 _TICKER_STOPWORDS = {
     "AGAINST", "AND", "ANOMALIES", "ANOMALY", "ABOUT", "BANK", "BANKS", "CALCULATE",
     "COMPARE", "COMPANIES", "COMPANY", "DATA", "DISCOVER", "FIND", "FINANCIAL",
@@ -621,7 +621,7 @@ def _ticker_key(ticker: str) -> str:
 
 def _is_ticker(value: Any) -> bool:
     return isinstance(value, str) and bool(
-        re.fullmatch(r"[A-Z0-9]{3,8}(?:\.JK)?", value, re.IGNORECASE)
+        re.fullmatch(r"[A-Z0-9]{3,20}(?:\.JK)?", value, re.IGNORECASE)
     )
 
 

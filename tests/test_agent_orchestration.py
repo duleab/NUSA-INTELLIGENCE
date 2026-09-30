@@ -18,6 +18,7 @@ from nusa.agent.session_memory import ResearchSessionMemory
 from nusa.discovery.banks import normalize_bank_universe
 from nusa.discovery.workflow import build_discovery_data, discover_banks
 from nusa.providers.base import BankUniverseResult, CompanyData, DataSourceStatus
+from nusa.providers.sectors import create_bank_data_provider
 
 
 def discovery_fixture():
@@ -29,11 +30,11 @@ def discovery_fixture():
                 "query_values": {"revenue[2024]": 100, "revenue[2025]": value},
             }
             for ticker, value in [
-                ("BBRI", 110),
-                ("BBCA", 108),
-                ("BMRI", 112),
-                ("BBNI", 105),
-                ("BRIS", 200),
+                ("DEMOBANK1", 110),
+                ("DEMOBANK2", 108),
+                ("DEMOBANK3", 112),
+                ("DEMOBANK4", 105),
+                ("DEMOBANK5", 200),
             ]
         ],
         "pagination": {"total_count": 5, "showing": 5, "limit": 5},
@@ -159,11 +160,11 @@ class RoutingAndOrchestrationTests(unittest.TestCase):
         provider = InMemoryProvider()
         orchestrator = ResearchOrchestrator(provider)
 
-        result = orchestrator.run("Investigate BBRI")
+        result = orchestrator.run("Investigate DEMOBANK1")
 
         self.assertEqual(result.plan.intent, "INVESTIGATE")
-        self.assertEqual(provider.company_requests, ["BBRI.JK"])
-        self.assertTrue(result.evidence_ledger.by_ticker("BBRI"))
+        self.assertEqual(provider.company_requests, ["DEMOBANK1"])
+        self.assertTrue(result.evidence_ledger.by_ticker("DEMOBANK1"))
         self.assertEqual(result.synthesis_context["data_source"]["mode"], "demo")
         self.assertEqual(result.synthesis.generation_mode, "template")
         self.assertTrue(result.synthesis.evidence_references)
@@ -185,20 +186,20 @@ class RoutingAndOrchestrationTests(unittest.TestCase):
         event_positions = [events.index(event) for event in expected_events]
         self.assertEqual(event_positions, sorted(event_positions))
         self.assertNotIn("chain_of_thought", str(result.trace.to_dict()).lower())
-        self.assertNotIn("Investigate BBRI", str(result.trace.to_dict()))
+        self.assertNotIn("Investigate DEMOBANK1", str(result.trace.to_dict()))
 
     def test_discover_and_compare_plans_execute_with_registered_tools(self):
         provider = InMemoryProvider()
         orchestrator = ResearchOrchestrator(provider)
 
         discovery = orchestrator.run("Find unusual banks")
-        comparison = orchestrator.run("Compare BBRI with BBCA and BMRI")
+        comparison = orchestrator.run("Compare DEMOBANK1 with DEMOBANK2 and DEMOBANK3")
 
         self.assertEqual(discovery.plan.intent, "DISCOVER")
         self.assertEqual(comparison.plan.intent, "COMPARE")
         self.assertIn("compare_peer_metrics", comparison.outputs)
         self.assertEqual(comparison.outputs["compare_peer_metrics"].value["tickers"], [
-            "BBRI.JK", "BBCA.JK", "BMRI.JK"
+            "DEMOBANK1", "DEMOBANK2", "DEMOBANK3"
         ])
 
     def test_llm_can_resolve_only_when_deterministic_intent_parser_cannot(self):
@@ -210,21 +211,21 @@ class RoutingAndOrchestrationTests(unittest.TestCase):
                 self.calls += 1
                 return {
                     "intent": "COMPARE",
-                    "tickers": ["BBRI.JK", "BBCA.JK"],
+                    "tickers": ["DEMOBANK1", "DEMOBANK2"],
                     "tasks": [{
                         "tool": "compare_peer_metrics",
                         "purpose": "Compare the requested banks.",
-                        "arguments": {"tickers": ["BBRI.JK", "BBCA.JK"]},
+                        "arguments": {"tickers": ["DEMOBANK1", "DEMOBANK2"]},
                     }],
                 }
 
         mock = PlanMock()
         result = ResearchOrchestrator(
             InMemoryProvider(), synthesizer=LLMResearchSynthesizer(mock)
-        ).run("Differences between BBRI and BBCA")
+        ).run("Differences between DEMOBANK1 and DEMOBANK2")
 
         self.assertEqual(result.plan.intent, "COMPARE")
-        self.assertEqual(result.plan.tickers, ("BBRI.JK", "BBCA.JK"))
+        self.assertEqual(result.plan.tickers, ("DEMOBANK1", "DEMOBANK2"))
         self.assertEqual(result.synthesis.generation_mode, "template")
         self.assertEqual(mock.calls, 2)  # one plan proposal; synthesis response rejected safely
 
@@ -233,7 +234,7 @@ class RoutingAndOrchestrationTests(unittest.TestCase):
             def complete_json(self, system_prompt, user_prompt):
                 return {
                     "intent": "COMPARE",
-                    "tickers": ["BBRI.JK", "BBCA.JK"],
+                    "tickers": ["DEMOBANK1", "DEMOBANK2"],
                     "tasks": [{
                         "tool": "run_shell",
                         "purpose": "unsafe",
@@ -245,31 +246,63 @@ class RoutingAndOrchestrationTests(unittest.TestCase):
             InMemoryProvider(), synthesizer=LLMResearchSynthesizer(UnsafePlanMock())
         )
         with self.assertRaises(UnsupportedIntentError):
-            orchestrator.run("Differences between BBRI and BBCA")
+            orchestrator.run("Differences between DEMOBANK1 and DEMOBANK2")
 
     def test_session_memory_resolves_followup_against_investigated_change(self):
         provider = InMemoryProvider()
         memory = ResearchSessionMemory()
         orchestrator = ResearchOrchestrator(provider, session_memory=memory)
 
-        investigation = orchestrator.run("Investigate BBRI")
-        comparison = orchestrator.run("Compare this change with BBCA and BMRI")
+        investigation = orchestrator.run("Investigate DEMOBANK1")
+        comparison = orchestrator.run("Compare this change with DEMOBANK2 and DEMOBANK3")
 
         self.assertEqual(investigation.plan.intent, "INVESTIGATE")
         self.assertEqual(comparison.plan.intent, "COMPARE")
-        self.assertEqual(comparison.plan.tickers, ("BBRI.JK", "BBCA.JK", "BMRI.JK"))
+        self.assertEqual(comparison.plan.tickers, ("DEMOBANK1", "DEMOBANK2", "DEMOBANK3"))
         self.assertEqual(comparison.plan.tasks[0].arguments["metric"], "revenue")
         self.assertEqual(comparison.outputs["compare_peer_metrics"].value["metric"], "revenue")
         self.assertTrue(all(
             item.metric == "revenue" for item in comparison.evidence_ledger
         ))
-        self.assertEqual(memory.active_ticker, "BBRI.JK")
+        self.assertEqual(memory.active_ticker, "DEMOBANK1")
         self.assertEqual(memory.active_sector, "Banks")
-        self.assertEqual(memory.last_investigation_objective, "Investigate BBRI")
+        self.assertEqual(memory.last_investigation_objective, "Investigate DEMOBANK1")
         self.assertEqual(memory.last_anomaly_metric, "revenue")
-        self.assertEqual(memory.selected_peers, ["BBCA.JK", "BMRI.JK"])
+        self.assertEqual(memory.selected_peers, ["DEMOBANK2", "DEMOBANK3"])
         self.assertEqual(memory.evidence_ids, [item.evidence_id for item in comparison.evidence_ledger])
         self.assertEqual(memory.previous_plan, comparison.plan.to_dict())
+
+    def test_bundled_demo_journey_investigates_and_resolves_memory_comparison(self):
+        provider = create_bank_data_provider("demo")
+        memory = ResearchSessionMemory()
+        orchestrator = ResearchOrchestrator(provider, session_memory=memory)
+
+        discovery = orchestrator.run("Find unusual financial changes among Indonesian banks.")
+        selected = discovery.outputs["discover_bank_anomalies"].value["anomalies"][0]["ticker"]
+        investigation = orchestrator.run(f"Investigate {selected}")
+        followup = orchestrator.run(
+            "Compare this change with DEMOBANK2 and DEMOBANK3."
+        )
+
+        comparison = followup.outputs["compare_peer_metrics"].value
+        self.assertEqual(selected, "DEMOBANK5")
+        self.assertEqual(investigation.plan.intent, "INVESTIGATE")
+        self.assertTrue(investigation.evidence_ledger.by_ticker(selected))
+        self.assertEqual(followup.plan.intent, "COMPARE")
+        self.assertEqual(
+            followup.plan.tickers,
+            ("DEMOBANK5", "DEMOBANK2", "DEMOBANK3"),
+        )
+        expected_metric = discovery.outputs["discover_bank_anomalies"].value["anomalies"][0]["primary_driver"]
+        self.assertEqual(followup.plan.tasks[0].arguments["metric"], expected_metric)
+        self.assertEqual(comparison["metric"], expected_metric)
+        self.assertEqual(
+            {item.ticker for item in followup.evidence_ledger},
+            {"DEMOBANK5", "DEMOBANK2", "DEMOBANK3"},
+        )
+        self.assertTrue(all(item.metric == expected_metric for item in followup.evidence_ledger))
+        self.assertEqual(memory.last_anomaly_metric, expected_metric)
+        self.assertEqual(memory.selected_peers, ["DEMOBANK2", "DEMOBANK3"])
 
     def test_session_memory_is_reused_from_session_state(self):
         session_state = {}

@@ -98,7 +98,10 @@ def _show_data_status(mode: str) -> None:
         unsafe_allow_html=True,
     )
     if not is_live:
-        st.warning("DEMO/SAMPLE DATA — not current live market data", icon="⚠️")
+        st.warning(
+            "DEMO/SAMPLE DATA — Synthetic demonstration values. Not current market data.",
+            icon="⚠️",
+        )
     elif warning:
         st.caption(f"Source note: {warning}")
 
@@ -141,7 +144,12 @@ if st.session_state.get("nusa_source_mode") != source_mode:
     st.session_state.pop("nusa_company_rows", None)
     st.session_state.pop("nusa_investigation_result", None)
     st.session_state.pop("nusa_investigation_report", None)
+    st.session_state.pop("nusa_followup_result", None)
     st.session_state.pop("nusa_selected_ticker", None)
+    st.session_state.pop("nusa_company_selector", None)
+    st.session_state.pop("nusa_priority_ticker", None)
+    st.session_state.pop("nusa_research_question", None)
+    st.session_state.pop(ResearchSessionMemory.SESSION_KEY, None)
     st.session_state["nusa_cache_version"] = st.session_state.get("nusa_cache_version", 0)
 
 _show_data_status(source_mode)
@@ -156,7 +164,13 @@ with discover_tab:
     st.subheader("Banking sector monitor")
     st.write("Screen the available bank universe for unusual annual financial changes.")
     analyze = st.button("Analyze Banks", type="primary", key="analyze_banks")
-    if analyze:
+    demo_discover = False
+    if source_mode == "demo":
+        demo_discover = st.button(
+            "Example: Find unusual financial changes among Indonesian banks",
+            key="demo_discover_example",
+        )
+    if analyze or demo_discover:
         try:
             with st.spinner("Analyzing the selected data source…"):
                 ranked_rows, company_rows, status = _cached_discovery(
@@ -166,7 +180,10 @@ with discover_tab:
             st.session_state["nusa_company_rows"] = company_rows
             _set_status(status)
             if not status.get("is_live"):
-                st.warning("DEMO/SAMPLE DATA — not current live market data", icon="⚠️")
+                st.warning(
+                    "DEMO/SAMPLE DATA — Synthetic demonstration values. Not current market data.",
+                    icon="⚠️",
+                )
         except Exception as error:
             failed_status = asdict(_provider(source_mode).status)
             _set_status(failed_status)
@@ -220,7 +237,17 @@ with discover_tab:
             st.metric("Priority score", selected_row.get("score", "Not available"))
         if st.button("Investigate selected bank", key="investigate_priority"):
             st.session_state["nusa_selected_ticker"] = chosen_ticker
+            st.session_state["nusa_company_selector"] = chosen_ticker
             st.success("Company selected. Continue in the INVESTIGATE section.")
+        if source_mode == "demo" and st.button(
+            "Investigate highest-ranked demo bank", key="demo_investigate_top"
+        ):
+            top_ticker = str(selector_rows[0]["ticker"])
+            st.session_state["nusa_selected_ticker"] = top_ticker
+            st.session_state["nusa_company_selector"] = top_ticker
+            st.success(
+                f"{_company_label(selector_rows[0])} selected. Open INVESTIGATE and run the workflow."
+            )
 
 
 with investigate_tab:
@@ -258,12 +285,27 @@ with investigate_tab:
             format_func=lambda value: _company_label(by_ticker[value]),
             key="nusa_company_selector",
         )
+        if source_mode == "demo" and st.button(
+            "Example comparison: this change with DEMOBANK2 and DEMOBANK3",
+            key="demo_comparison_example",
+        ):
+            st.session_state["nusa_research_question"] = (
+                "Compare this change with DEMOBANK2 and DEMOBANK3."
+            )
         question = st.text_input(
             "Research question",
-            placeholder="e.g. What drove the change, and how does it compare with peers?",
+            placeholder="Run an investigation, then ask a follow-up about its validated evidence.",
             key="nusa_research_question",
         )
         run_research = st.button("Run investigation", type="primary", key="run_investigation")
+        run_followup = st.button(
+            "Run follow-up peer comparison",
+            key="run_followup_comparison",
+            disabled=(
+                st.session_state.get("nusa_investigation_result") is None
+                or not question.strip()
+            ),
+        )
         if run_research:
             try:
                 memory = ResearchSessionMemory.from_session_state(st.session_state)
@@ -275,13 +317,9 @@ with investigate_tab:
                 )
                 with st.spinner("Running the evidence-led research workflow…"):
                     result = orchestrator.run(f"Investigate {ticker}")
-                    report = (
-                        orchestrator.answer_followup(question, result)
-                        if question.strip()
-                        else result.synthesis
-                    )
                 st.session_state["nusa_investigation_result"] = result
-                st.session_state["nusa_investigation_report"] = report
+                st.session_state["nusa_investigation_report"] = result.synthesis
+                st.session_state.pop("nusa_followup_result", None)
                 _set_status(asdict(_provider(source_mode).status))
             except Exception as error:
                 failed_status = asdict(_provider(source_mode).status)
@@ -292,6 +330,24 @@ with investigate_tab:
                 )
                 if failed_status.get("warning"):
                     st.caption(f"Source status: {failed_status['warning']}")
+
+        if run_followup:
+            try:
+                memory = ResearchSessionMemory.from_session_state(st.session_state)
+                orchestrator = ResearchOrchestrator(
+                    _provider(source_mode),
+                    synthesizer=LLMResearchSynthesizer(create_llm_provider_from_env()),
+                    session_memory=memory,
+                )
+                with st.spinner("Resolving the follow-up from session memory…"):
+                    followup_result = orchestrator.run(question)
+                st.session_state["nusa_followup_result"] = followup_result
+                _set_status(asdict(_provider(source_mode).status))
+            except Exception as error:
+                st.error(
+                    f"The follow-up comparison could not be completed ({type(error).__name__}). "
+                    "It requires an existing investigation with validated metric evidence."
+                )
 
     result = st.session_state.get("nusa_investigation_result")
     if result is not None:
@@ -384,6 +440,34 @@ with investigate_tab:
                 st.caption("No additional validated detail available.")
         if report.evidence_references:
             st.caption("Evidence references: " + ", ".join(report.evidence_references))
+
+        followup_result = st.session_state.get("nusa_followup_result")
+        if followup_result is not None:
+            comparison_output = followup_result.outputs.get("compare_peer_metrics")
+            st.markdown("#### Follow-up peer comparison")
+            st.caption(
+                "Resolved from session memory: "
+                f"{', '.join(followup_result.plan.tickers)} · "
+                f"metric: {followup_result.plan.tasks[0].arguments.get('metric', 'not specified')}"
+            )
+            if comparison_output and comparison_output.value.get("comparisons"):
+                comparison_frame = pd.DataFrame(comparison_output.value["comparisons"])
+                display_columns = [
+                    column
+                    for column in (
+                        "ticker", "metric", "period", "change", "peer_median",
+                        "peer_count", "deviation", "evidence_id",
+                    )
+                    if column in comparison_frame.columns
+                ]
+                st.dataframe(
+                    comparison_frame[display_columns],
+                    hide_index=True,
+                    width="stretch",
+                )
+                st.caption(followup_result.synthesis.executive_summary)
+            else:
+                st.info("No validated comparison evidence was available for the requested peers.")
 
 
 with methodology_tab:
