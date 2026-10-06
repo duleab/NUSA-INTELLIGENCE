@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import TypeAlias
 
 from nusa.discovery.anomaly import rank_anomalies
 from nusa.discovery.banks import BankUniverse
 from nusa.discovery.evidence import evidence_from_anomalies
 from nusa.providers.base import BankDataProvider, DataSourceStatus, DiscoveryData
 
-DiscoveryResult = DiscoveryData
+DiscoveryResult: TypeAlias = DiscoveryData
 
 
 def discover_banks(
@@ -35,7 +36,8 @@ def build_discovery_data(
         data_mode=data_mode,
         source=status.source,
         source_endpoint=(
-            "/v2/companies/" if status.is_live
+            "/v2/companies/"
+            if status.is_live or status.mode == "cached_sectors"
             else "fixture://local"
         ),
     )

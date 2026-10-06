@@ -5,10 +5,82 @@ import unittest
 from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
-from nusa.sectors.client import SectorsAPIError, SectorsClient
+from nusa.sectors.client import SectorsAPIError, SectorsClient, _requests_transport
 
 
 class SectorsClientTests(unittest.TestCase):
+    def test_requests_transport_uses_plain_nusa_headers_and_no_environment_proxy(self):
+        observed = {}
+        response = unittest.mock.Mock()
+        response.status_code = 200
+        response.json.return_value = {"ok": True}
+        session = unittest.mock.Mock()
+        session.get.return_value = response
+
+        def make_session():
+            observed["session"] = session
+            return session
+
+        with patch("nusa.sectors.client.requests.Session", side_effect=make_session):
+            result = _requests_transport(
+                "https://api.sectors.app/v2/companies/?limit=3",
+                {
+                    "Authorization": "mock-secret",
+                    "Accept": "application/json",
+                    "User-Agent": "NUSA-Intelligence-Hackathon/1.0",
+                },
+                20,
+            )
+
+        self.assertEqual(result, (200, {"ok": True}))
+        self.assertFalse(session.trust_env)
+        session.get.assert_called_once_with(
+            "https://api.sectors.app/v2/companies/?limit=3",
+            headers={
+                "Authorization": "mock-secret",
+                "Accept": "application/json",
+                "User-Agent": "NUSA-Intelligence-Hackathon/1.0",
+            },
+            timeout=20,
+        )
+        session.close.assert_called_once()
+
+    def test_requests_transport_exposes_only_sanitized_403_diagnostics(self):
+        response = unittest.mock.Mock()
+        response.status_code = 403
+        response.headers = {
+            "server": "cloudflare",
+            "cf-ray": "test-ray-id",
+            "set-cookie": "private-cookie",
+            "authorization": "never expose",
+            "content-type": "application/json",
+        }
+        response.json.return_value = {
+            "error_code": 1010,
+            "error_name": "browser_signature_banned",
+            "message": "Request rejected",
+            "api_key": "private-key-value",
+        }
+        session = unittest.mock.Mock()
+        session.get.return_value = response
+        with patch("nusa.sectors.client.requests.Session", return_value=session):
+            with self.assertRaises(SectorsAPIError) as raised:
+                _requests_transport(
+                    "https://api.sectors.app/v2/companies/?limit=3",
+                    {"Authorization": "mock-secret", "Accept": "application/json"},
+                    20,
+                )
+
+        error = raised.exception
+        self.assertEqual(error.status, 403)
+        self.assertEqual(error.body["error_code"], 1010)
+        self.assertEqual(error.body["error_name"], "browser_signature_banned")
+        self.assertNotIn("api_key", error.body)
+        self.assertEqual(error.headers["server"], "cloudflare")
+        self.assertEqual(error.headers["cf-ray"], "test-ray-id")
+        self.assertNotIn("set-cookie", error.headers)
+        self.assertNotIn("authorization", error.headers)
+
     def test_company_report_uses_existing_authenticated_transport(self):
         observed = []
         payload = {"symbol": "BBRI", "financials": {}}
@@ -48,6 +120,9 @@ class SectorsClientTests(unittest.TestCase):
             self.assertEqual(second, payload)
             self.assertEqual(len(observed), 1)
             self.assertEqual(observed[0][1]["Authorization"], "test-secret")
+            self.assertEqual(
+                observed[0][1]["User-Agent"], "NUSA-Intelligence-Hackathon/1.0"
+            )
             self.assertNotIn("test-secret", json.dumps(list(os.walk(cache_dir))))
 
     def test_requires_environment_key_without_echoing_it(self):

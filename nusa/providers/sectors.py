@@ -214,13 +214,24 @@ def create_bank_data_provider(
     client: Any | None = None,
     fixture_path: str | Path | None = None,
     source_label: str | None = None,
+    snapshot_path: str | Path | None = None,
 ) -> BankDataProvider:
     """Select a provider explicitly; errors never trigger implicit source switching."""
     if mode == "live":
-        if fixture_path is not None or source_label is not None:
-            raise ValueError("Fixture options cannot be combined with live mode")
+        if fixture_path is not None or source_label is not None or snapshot_path is not None:
+            raise ValueError("Fixture or snapshot options cannot be combined with live mode")
         return SectorsBankDataProvider(client=client)
+    if mode == "cached_sectors":
+        if client is not None or fixture_path is not None or source_label is not None:
+            raise ValueError("Cached Sectors mode cannot be combined with live or fixture options")
+        if snapshot_path is None:
+            raise ValueError("Cached Sectors mode requires snapshot_path")
+        from nusa.providers.sectors_snapshot import CachedSectorsBankDataProvider
+
+        return CachedSectorsBankDataProvider(snapshot_path)
     if mode in {"demo", "fixture"}:
+        if snapshot_path is not None:
+            raise ValueError("snapshot_path requires cached_sectors mode")
         if fixture_path is not None:
             if not source_label:
                 raise ValueError("An explicit source_label is required for external fixtures")
@@ -237,7 +248,7 @@ def create_bank_data_provider(
             source_label="DEMO/SAMPLE — bundled synthetic development fixture",
             data_mode="synthetic",
         )
-    raise ValueError("mode must be explicitly set to live, demo, or fixture")
+    raise ValueError("mode must be explicitly set to live, cached_sectors, demo, or fixture")
 
 
 def _ensure_secret_free(payload: dict[str, Any]) -> None:

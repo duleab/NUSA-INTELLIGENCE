@@ -13,6 +13,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
+import requests  # type: ignore[import-untyped]
+
 
 Transport = Callable[[str, dict[str, str], float], tuple[int, Any]]
 
@@ -20,9 +22,18 @@ Transport = Callable[[str, dict[str, str], float], tuple[int, Any]]
 class SectorsAPIError(RuntimeError):
     """An API failure without credential or response-body disclosure."""
 
-    def __init__(self, status: int, path: str):
+    def __init__(
+        self,
+        status: int,
+        path: str,
+        *,
+        body: Any = None,
+        headers: dict[str, str] | None = None,
+    ):
         self.status = status
         self.path = path
+        self.body = body
+        self.headers = headers or {}
         super().__init__(f"Sectors API returned HTTP {status} for {path}")
 
 
@@ -35,6 +46,64 @@ def _urllib_transport(url: str, headers: dict[str, str], timeout: float) -> tupl
         raise SectorsAPIError(error.code, Request(url).full_url.split("?", 1)[0]) from None
     except URLError as error:
         raise RuntimeError(f"Sectors API connection failed: {error.reason}") from None
+
+
+_SAFE_RESPONSE_HEADERS = frozenset(
+    {"server", "cf-ray", "cf-cache-status", "cf-mitigated", "content-type", "date", "retry-after"}
+)
+_SENSITIVE_RESPONSE_KEY = re.compile(
+    r"(?i)(authorization|cookie|api.?key|access.?token|client.?secret|password|account|email|user.?id)"
+)
+_SECRET_VALUE = re.compile(
+    r"(?i)(\bBearer\s+\S+|\bSECTORS_API_KEY\s*=\s*\S+|"
+    r"\b(?:sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9_]{20,})\b)"
+)
+
+
+def _sanitize_diagnostic(value: Any) -> Any:
+    """Remove credential-like material from error bodies before exposing diagnostics."""
+    if isinstance(value, dict):
+        return {
+            str(key): _sanitize_diagnostic(nested)
+            for key, nested in value.items()
+            if not _SENSITIVE_RESPONSE_KEY.search(str(key))
+        }
+    if isinstance(value, list):
+        return [_sanitize_diagnostic(item) for item in value]
+    if isinstance(value, str):
+        return _SECRET_VALUE.sub("[REDACTED]", value)
+    return value
+
+
+def _requests_transport(url: str, headers: dict[str, str], timeout: float) -> tuple[int, Any]:
+    """Make one standard requests call without environment proxies or retries."""
+    session = requests.Session()
+    session.trust_env = False
+    try:
+        response = session.get(url, headers=headers, timeout=timeout)
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = response.text
+        if not 200 <= response.status_code < 300:
+            diagnostic_headers = {
+                name.lower(): value
+                for name, value in response.headers.items()
+                if name.lower() in _SAFE_RESPONSE_HEADERS
+            }
+            raise SectorsAPIError(
+                response.status_code,
+                url.split("?", 1)[0].removeprefix("https://api.sectors.app"),
+                body=_sanitize_diagnostic(payload),
+                headers=diagnostic_headers,
+            )
+        if isinstance(payload, str):
+            raise RuntimeError("Sectors API returned a non-JSON success response")
+        return response.status_code, payload
+    except requests.RequestException:
+        raise RuntimeError("Sectors API connection failed using requests transport") from None
+    finally:
+        session.close()
 
 
 class SectorsClient:
@@ -161,7 +230,11 @@ class SectorsClient:
 
         query = urlencode(params)
         url = f"{self.base_url}{path}?{query}" if query else f"{self.base_url}{path}"
-        headers = {"Authorization": api_key, "Accept": "application/json"}
+        headers = {
+            "Authorization": api_key,
+            "Accept": "application/json",
+            "User-Agent": "NUSA-Intelligence-Hackathon/1.0",
+        }
         attempt = 0
         while True:
             try:

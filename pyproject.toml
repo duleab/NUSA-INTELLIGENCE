@@ -3,7 +3,7 @@ name = "nusa-intelligence"
 version = "0.1.0"
 description = "Credit-conscious Indonesian bank discovery foundation"
 requires-python = ">=3.10"
-dependencies = ["pandas>=2.2"]
+dependencies = ["pandas>=2.2", "requests>=2.31"]
 
 [tool.ruff]
 line-length = 100
