@@ -1,44 +1,49 @@
 # NUSA Intelligence — One-Minute Teaser
 
-Target duration: approximately 55–60 seconds. Keep the DEMO/SAMPLE badge and
-the warning **Synthetic demonstration values. Not current market data.** in
-frame for every financial-data shot.
+Target duration: approximately 55–60 seconds. Keep this status visible on every
+real-data shot: **SECTORS CACHED SNAPSHOT — Sectors-origin data — Not a live
+refresh.** Do not present the snapshot as a live refresh.
 
 ### 0–8 sec — Problem
 
-**Visual:** NUSA title, then Discovery screen.
-**Voiceover:** “Financial markets generate enormous amounts of data. The
-challenge is knowing what deserves investigation.”
+**Visual:** NUSA title, cached-source badge, then Discovery.
+**Voiceover:** “Financial analysts have access to large amounts of data. The
+challenge is deciding which changes deserve closer investigation—and showing
+the evidence behind that decision.”
 
 ### 8–16 sec — Introduce NUSA
 
-**Visual:** Show the NUSA Intelligence title and the three product sections.
-**Voiceover:** “Meet NUSA Intelligence, an autonomous AI research agent for
-unusual financial changes in Indonesian listed companies.”
+**Visual:** Show the three app sections and source badge.
+**Voiceover:** “NUSA Intelligence is an autonomous AI research agent for unusual
+financial changes among Indonesian listed banks. It combines deterministic
+analysis with custom agent orchestration and evidence validation.”
 
 ### 16–30 sec — Discovery
 
-**Visual:** DEMO/SAMPLE warning, click the example Discovery action, show five
-fictional banks and DEMOBANK5 ranked first.
-**Voiceover:** “NUSA ranks unusual annual changes in a focused banking sample.
-This screen uses fictional synthetic values—not current market data—and the
-score is a research priority, not an investment signal.”
+**Visual:** Analyze the 48-bank IDX universe. Keep the cached badge and
+not-live-refresh notice in frame. Highlight SUPA.JK and its primary driver.
+**Voiceover:** “Using a Sectors-origin cached snapshot of 48 IDX Banks, NUSA
+prioritizes SUPA.JK. Net interest income changed by 159.75%, compared with a
+peer median of about 1.69%. This is a cached snapshot, not a live refresh.”
 
 ### 30–45 sec — Investigation
 
-**Visual:** Investigate DEMOBANK5; show the plan, registered tools, analysis,
-Evidence Ledger, and validation progress.
-**Voiceover:** “It doesn’t stop at a score. The agent creates a plan, routes
-registered tools, performs deterministic analysis, and validates evidence
-before writing its report.”
+**Visual:** Investigate SUPA.JK. Show the plan, registered tool execution,
+Evidence Ledger, validation status, and deterministic report.
+**Voiceover:** “The agent creates a structured research plan, routes registered
+tools, and validates the financial evidence before producing a report. Python
+does the calculations; the language model does not originate financial
+numbers.”
 
-### 45–55 sec — Report / comparison
+### 45–55 sec — Follow-up comparison
 
-**Visual:** Report and memory-driven comparison with DEMOBANK2 and DEMOBANK3.
-**Voiceover:** “Then it explains what changed and compares the same metric with
-fictional peers—while keeping the evidence and limitations visible.”
+**Visual:** Ask, “Compare this change with BBSI.JK and BBHI.JK.” Show resolved
+metric and the comparison table.
+**Voiceover:** “Session memory resolves ‘this change’ to net interest income.
+The comparison is 159.75% for SUPA, 91.97% for BBSI, and 28.93% for BBHI.”
 
 ### 55–60 sec — Close
 
-**Visual:** Product name and Discover → Investigate → Explain.
-**Voiceover:** “NUSA Intelligence — Discover what changed. Investigate why.”
+**Visual:** NUSA title with the cached-source notice still visible.
+**Voiceover:** “NUSA Intelligence—discover what changed, verify the evidence,
+and investigate what matters.”

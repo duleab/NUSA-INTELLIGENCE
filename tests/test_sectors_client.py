@@ -9,6 +9,21 @@ from nusa.sectors.client import SectorsAPIError, SectorsClient, _requests_transp
 
 
 class SectorsClientTests(unittest.TestCase):
+    def test_default_client_uses_the_standard_requests_transport(self):
+        with tempfile.TemporaryDirectory() as cache_dir, patch.dict(
+            os.environ, {"SECTORS_API_KEY": "test-secret"}
+        ), patch(
+            "nusa.sectors.client._requests_transport", return_value=(200, {"ok": True})
+        ) as requests_transport, patch(
+            "nusa.sectors.client._urllib_transport",
+            side_effect=AssertionError("default client must not use urllib"),
+        ):
+            client = SectorsClient(cache_dir=cache_dir, retries=0)
+
+            self.assertEqual(client.subsectors(force_refresh=True), {"ok": True})
+
+        requests_transport.assert_called_once()
+
     def test_requests_transport_uses_plain_nusa_headers_and_no_environment_proxy(self):
         observed = {}
         response = unittest.mock.Mock()

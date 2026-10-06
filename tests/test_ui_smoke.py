@@ -1,5 +1,6 @@
 import unittest
 import os
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,15 +10,21 @@ from streamlit.testing.v1 import AppTest
 class StreamlitApplicationTests(unittest.TestCase):
     def test_home_renders_three_research_sections_with_demo_warning(self):
         app_path = Path(__file__).resolve().parents[1] / "app.py"
-        with patch.dict(os.environ, {"NUSA_LLM_API_KEY": ""}):
-            app = AppTest.from_file(str(app_path), default_timeout=15).run()
+        with tempfile.TemporaryDirectory() as temp_dir, patch.dict(
+            os.environ, {"NUSA_LLM_API_KEY": ""}
+        ), patch(
+            "nusa.providers.sectors_snapshot.DEFAULT_SECTORS_SNAPSHOT_PATH",
+            Path(temp_dir) / "absent-snapshot.json",
+        ):
+            app = AppTest.from_file(str(app_path), default_timeout=30).run()
 
             self.assertFalse(app.exception)
             visible_text = " ".join(element.value for element in app.markdown)
             self.assertEqual(
                 [tab.label for tab in app.tabs], ["DISCOVER", "INVESTIGATE", "METHODOLOGY"]
             )
-            self.assertIn("LIVE — Sectors", app.selectbox[0].options)
+            self.assertIn("LIVE SECTORS", app.selectbox[0].options)
+            self.assertIn("DEMO/SAMPLE", app.selectbox[0].options)
             self.assertIn("DEMO/SAMPLE", visible_text)
             source_warning = " ".join(item.value for item in app.warning)
             self.assertIn("DEMO/SAMPLE DATA", source_warning)

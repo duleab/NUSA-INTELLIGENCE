@@ -3,6 +3,17 @@
 **Research date:** 22 September 2026
 **Scope:** Official Sectors Hackathon, API v2, MCP documentation, and one authenticated Playground validation. The API key is deliberately not stored, copied, logged, or placed in this repository.
 
+## Current status update — 6 October 2026
+
+The historical 403 attempts below were superseded by the successful Phase 11D
+integration. The authenticated Python client now retrieves the Companies
+Screener response: **48 IDX Banks** with annual 2024/2025 values for earnings,
+net interest income, total assets, total equity, and ROA. The local judging
+workflow reads a validated Sectors-origin snapshot and labels it
+**SECTORS CACHED SNAPSHOT — Not a live refresh**. This local snapshot is ignored
+by Git and is not distributed in repository clones. The earlier 403 paragraphs
+are retained as incident history only, not as current API status.
+
 ## Authenticated validation
 
 **REAL DATA ACCESS: YES.** On 22 September 2026, the authenticated Sectors API Playground showed **600 credits remaining** and returned **HTTP 200** from `GET /v2/subsectors/`. The response contained 33 actual IDX sector/subsector slug pairs, including `financials` / `banks`; the Playground explicitly distinguishes this signed-in response from Demo Mode mock data. No additional live endpoint was executed in this pass.
@@ -13,7 +24,7 @@ This validates authenticated API access and the taxonomy required by the Banks M
 
 On 25 September 2026, one bounded structured request was made to `GET /v2/companies/` with `where=sub_sector = 'Banks'`, `order_by=-market_cap`, `limit=50`, `offset=0`, and `include_query_values=true`. It returned **HTTP 403**. Retries were disabled and no second request was made. No response rows, schema, metrics, or anomaly results were available to inspect. No credit-balance header was exposed; the API error table above documents 403 responses as free, so the documented expected consumption is zero, but the account balance was not independently observed.
 
-The failed response was not retained as a fixture. The key was read from the project environment file into the request process and was not printed or stored by this validation. `.gitignore` contains a `.env` rule, but this workspace is not a Git worktree, so `git check-ignore` could not be run. The live Screener schema and metric coverage remain unverified; the earlier authenticated `/v2/subsectors/` result does not establish Screener authorization.
+At that historical checkpoint the failed response was not retained as a fixture. The key was read from the project environment file into the request process and was not printed or stored by that validation. The live Screener schema and metric coverage were then unverified; subsequent Phase 11D validation resolved that status as recorded at the top of this document.
 
 ## Playground comparison and second controlled attempt
 
@@ -29,9 +40,9 @@ The 403 does not establish an account-entitlement failure. The large historical-
 
 The current Companies Screener reference documents annual values as `field[YYYY]`, quarterly values as `field[Qn-YYYY]`, arithmetic and field-to-field query expressions, and `include_query_values`. It lists bank-relevant annual fields including `revenue`, `earnings`, `eps`, `net_interest_income`, interest and non-interest income, `gross_loan`, `net_loan`, `total_deposit`, loan-loss allowance, assets, liabilities, equity, capital, risk-weighted assets, `roa`, `roe`, `net_interest_margin`, `capital_adequacy_ratio`, `casa_ratio`, `leverage_ratio`, `loan_to_deposit_ratio`, `liquidity_coverage_ratio`, and `efficiency_ratio`; annual `pe` and `pb` are also documented. General cash-flow fields (`operating_cash_flow`, `free_cash_flow`) and general margins are documented, but their interpretation/comparability for banks needs care. The API reference describes monetary fundamental fields in IDR; query values themselves do not carry unit metadata.
 
-The Screener documentation does not expose a separate `select`/`columns` query parameter. The attempted client therefore referenced metric fields in an OR-of-non-null `where` predicate and set `include_query_values=true`; whether that produces all referenced historical values while preserving the full 48-bank universe remains **unverified** because the request returned 403. The predicate may exclude a bank if all requested annual metrics are null. Documented field availability is not evidence of live coverage or peer comparability.
+The Screener documentation does not expose a separate `select`/`columns` query parameter. The client references metric fields in an OR-of-non-null `where` predicate and sets `include_query_values=true`. At the time of the earlier 403 this coverage question was unverified; Phase 11D later successfully retrieved the 48-bank dataset and the five annual metric pairs used by the MVP. The predicate can exclude a bank if all requested annual metrics are null. Documented field availability is not, by itself, evidence of coverage or peer comparability.
 
-No live Screener fixture was saved. The official rules and the API reference inspected for this pass do not specify whether raw Screener responses may be retained in a public development fixture. No LLM, agent, evidence, memory, or UI work was started.
+At the time of the original documentation pass no live Screener fixture had been saved, and redistribution permission was not established. Phase 11D later created a validated local Sectors-origin snapshot for offline analysis. The snapshot remains ignored and is not committed or included in public repository clones. No API credentials or headers are stored with it.
 
 ## Executive finding
 

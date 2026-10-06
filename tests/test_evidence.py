@@ -129,7 +129,7 @@ class EvidenceLedgerTests(unittest.TestCase):
         self.assertEqual(result.current_value, 200)
         self.assertEqual(result.change, 100.0)
         self.assertEqual(result.data_mode, "fixture")
-        self.assertIn("change_pct=((current/previous)-1)*100", result.calculation)
+        self.assertIn("change_pct=((current-previous)/abs(previous))*100", result.calculation)
 
     def test_discovery_result_exposes_evidence_ledger(self):
         payload = {

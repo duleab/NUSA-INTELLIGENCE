@@ -19,9 +19,11 @@ _NUMERIC_FIELDS = (
     "current_value",
     "previous_value",
     "change",
+    "absolute_change",
     "peer_median",
     "peer_count",
     "deviation",
+    "scoring_contribution",
 )
 
 
@@ -44,6 +46,11 @@ class Evidence:
     peer_median: int | float | None = None
     peer_count: int | None = None
     deviation: int | float | None = None
+    change_unit: str = "percent"
+    scoring_eligible: bool = True
+    exclusion_reason: str | None = None
+    absolute_change: int | float | None = None
+    scoring_contribution: int | float | None = None
     evidence_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     def __post_init__(self) -> None:
@@ -239,6 +246,16 @@ def evidence_from_anomalies(
             current_value = _native_number(current_value)
             if previous_value is None or current_value is None:
                 continue
+            scoring_eligible = bool(component.get("scoring_eligible", True))
+            change = _native_number(
+                component.get("change", component.get("change_pct"))
+            )
+            calculation = component.get("calculation") or (
+                f"change_pct=((current/previous)-1)*100 using {metric}[{current_year}] "
+                f"and {metric}[{previous_year}]; peer_median=median(other comparable "
+                "companies' change_pct; deviation=abs(change_pct-peer_median); "
+                "contribution=percentile_rank(abs(change_pct-universe_median))*100"
+            )
             ledger.add(
                 Evidence(
                     ticker=ticker,
@@ -249,20 +266,24 @@ def evidence_from_anomalies(
                     metric=metric,
                     current_value=current_value,
                     previous_value=previous_value,
-                    change=_native_number(component["change_pct"]),
+                    change=change,
                     peer_median=_native_number(component["peer_median_change_pct"]),
-                    peer_count=int(component["peer_count"]),
+                    peer_count=(
+                        int(component["peer_count"])
+                        if component.get("peer_count") is not None
+                        else None
+                    ),
                     deviation=_native_number(component["deviation_pct_points"]),
+                    change_unit=str(component.get("change_unit", "percent")),
+                    scoring_eligible=scoring_eligible,
+                    exclusion_reason=component.get("exclusion_reason"),
+                    absolute_change=_native_number(component.get("absolute_change")),
+                    scoring_contribution=_native_number(component.get("contribution")),
                     period=component["period"],
                     source=source,
                     source_endpoint=source_endpoint,
                     retrieved_at=timestamp_text,
-                    calculation=(
-                        f"change_pct=((current/previous)-1)*100 using {metric}[{current_year}] "
-                        f"and {metric}[{previous_year}]; peer_median=median(other comparable "
-                        "companies' change_pct; deviation=abs(change_pct-peer_median); "
-                        "contribution=percentile_rank(abs(change_pct-universe_median))*100"
-                    ),
+                    calculation=str(calculation),
                     data_mode=data_mode,
                 )
             )

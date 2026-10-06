@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 
 from nusa.agent.orchestration import (
     IntentResolver,
@@ -16,6 +17,7 @@ from nusa.agent.orchestration import (
 from nusa.agent.synthesis import LLMResearchSynthesizer
 from nusa.agent.session_memory import ResearchSessionMemory
 from nusa.discovery.banks import normalize_bank_universe
+from nusa.discovery.evidence import Evidence
 from nusa.discovery.workflow import build_discovery_data, discover_banks
 from nusa.providers.base import BankUniverseResult, CompanyData, DataSourceStatus
 from nusa.providers.sectors import create_bank_data_provider
@@ -133,6 +135,35 @@ class IntentAndPlanningTests(unittest.TestCase):
 
 
 class RoutingAndOrchestrationTests(unittest.TestCase):
+    def test_memory_prefers_primary_scoring_metric_over_excluded_metric(self):
+        memory = ResearchSessionMemory()
+        evidence = [
+            Evidence(
+                ticker="SUPA.JK", metric="earnings", period="2024 to 2025",
+                source="SECTORS CACHED SNAPSHOT", source_endpoint="/v2/companies/",
+                retrieved_at="2026-10-06T08:26:58+00:00",
+                calculation="percentage change not used for scoring",
+                data_mode="cached", current_value=100, previous_value=-100,
+                change=200, change_unit="IDR", scoring_eligible=False,
+                exclusion_reason="SIGN_TRANSITION", absolute_change=200,
+            ),
+            Evidence(
+                ticker="SUPA.JK", metric="net_interest_income", period="2024 to 2025",
+                source="SECTORS CACHED SNAPSHOT", source_endpoint="/v2/companies/",
+                retrieved_at="2026-10-06T08:26:58+00:00", calculation="validated",
+                data_mode="cached", current_value=200, previous_value=100,
+                change=100, scoring_contribution=80,
+            ),
+        ]
+        result = SimpleNamespace(
+            plan=SimpleNamespace(intent="INVESTIGATE", tickers=("SUPA.JK",), to_dict=lambda: {}),
+            outputs={}, evidence_ledger=evidence,
+        )
+
+        memory.record_run("Investigate SUPA.JK", result)
+
+        self.assertEqual(memory.last_anomaly_metric, "net_interest_income")
+
     def test_router_rejects_unsupported_tools_and_unexpected_arguments(self):
         provider = InMemoryProvider()
         context = ToolExecutionContext(provider)

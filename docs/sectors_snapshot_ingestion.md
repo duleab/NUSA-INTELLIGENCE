@@ -46,31 +46,61 @@ cookies, account identifiers, or other credentials in the raw response file.
 ## Import and read
 
 Save only the JSON response body (not headers) to a local file outside version
-control, then run:
+control, then import it into the ignored cache. A user with authorized API
+credentials can retrieve the documented bounded discovery request through the
+existing client and write the response body locally as follows. `SECTORS_API_KEY`
+must be present in the process environment or ignored `.env`; the code never
+prints or stores request headers.
 
 ```python
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+
+from nusa.sectors.client import SectorsClient
 from nusa.providers.sectors_snapshot import import_sectors_response_file
-from nusa.providers.sectors import create_bank_data_provider
+
+client = SectorsClient()
+years = client.discovery_years
+fields = [
+    f"{metric}[{year}]"
+    for metric in client.discovery_metrics
+    for year in years
+]
+where = f"{client.bank_filter} and (" + " or ".join(
+    f"{field} IS NOT NULL" for field in fields
+) + ")"
+query = {
+    "where": where,
+    "order_by": "-market_cap",
+    "limit": 50,
+    "include_query_values": True,
+}
+
+# force_refresh bypasses this client's local response cache for the retrieval.
+response = client.companies_screener(limit=50, force_refresh=True)
+retrieved_at = datetime.now(timezone.utc).isoformat()
+response_path = Path("data/cache/sectors/companies-response.json")
+response_path.parent.mkdir(parents=True, exist_ok=True)
+response_path.write_text(json.dumps(response, ensure_ascii=False), encoding="utf-8")
 
 snapshot_path = import_sectors_response_file(
-    r"C:\secure-local-path\companies-response.json",
-    query={
-        "where": "sub_sector = 'Banks' and market_cap IS NOT NULL",
-        "order_by": "-market_cap",
-        "limit": 50,
-        "include_query_values": True,
-    },
-    retrieved_at="<original timezone-aware retrieval timestamp>",
+    response_path,
+    query=query,
+    retrieved_at=retrieved_at,
     confirmed_sectors_origin=True,
 )
-provider = create_bank_data_provider("cached_sectors", snapshot_path=snapshot_path)
+print(f"Validated local snapshot saved at {snapshot_path}")
 ```
 
-The timestamp must be the response's original retrieval time, not the import time.
-The importer creates `snapshot_created_at` itself. An invalid file, missing
-metadata, suspicious synthetic ticker, or credential-like field fails closed.
-The cached provider never calls Sectors; `force_refresh=True` raises an error and
-requires an explicit import of a new response.
+Both `companies-response.json` and the generated snapshot are under ignored
+`data/cache/`; do not stage them. The timestamp is recorded immediately after a
+successful retrieval, and the importer creates `snapshot_created_at` itself.
+The importer validates the result structure and fails closed on missing
+metadata, suspicious synthetic tickers, or credential-like fields. The cached
+provider never calls Sectors; `force_refresh=True` raises an error and requires
+an explicit import of a new response. Delete or securely retain the raw response
+according to local data-handling policy; neither file belongs in public Git.
 
 ## Annual-field normalization
 

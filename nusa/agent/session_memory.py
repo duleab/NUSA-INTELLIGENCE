@@ -124,7 +124,18 @@ class ResearchSessionMemory:
         active_evidence = [item for item in items if _ticker_key(item.ticker) == active_key]
         metric_evidence = active_evidence or items
         if metric_evidence:
-            self.last_anomaly_metric = metric_evidence[0].metric
+            scored_evidence = [item for item in metric_evidence if item.scoring_eligible]
+            if scored_evidence:
+                primary_evidence = min(
+                    scored_evidence,
+                    key=lambda item: (
+                        -(item.scoring_contribution if item.scoring_contribution is not None else float("-inf")),
+                        item.metric,
+                    ),
+                )
+            else:
+                primary_evidence = metric_evidence[0]
+            self.last_anomaly_metric = primary_evidence.metric
         self.evidence_ids = [item.evidence_id for item in items]
         self.previous_plan = plan.to_dict()
 

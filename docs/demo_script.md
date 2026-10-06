@@ -7,12 +7,15 @@ Use the final timed scripts for submission and recording:
 
 ## Shared recording guardrails
 
-- Record in DEMO/SAMPLE mode and keep **DEMO/SAMPLE DATA — Synthetic
-  demonstration values. Not current market data.** visible on financial-data
-  shots.
-- Use only the fictional `DEMOBANK1`–`DEMOBANK5` fixture rows in the sample
-  workflow. Do not describe their synthetic values as Sectors data or live
-  Indonesian market findings.
-- Direct application `GET /v2/companies/` remains HTTP 403; do not imply the
-  live Companies Screener was demonstrated.
-- Keep `.env`, API keys, credentials, and hidden reasoning out of frame.
+- Use **SECTORS CACHED SNAPSHOT** mode for the real-data judging workflow and
+  keep the full status **Sectors-origin data — Not a live refresh** visible on
+  financial-data shots.
+- The verified Companies Screener returned 48 IDX Banks and annual 2024/2025
+  values for earnings, net interest income, total assets, total equity, and ROA.
+- Use the exact SUPA.JK investigation and BBSI.JK / BBHI.JK follow-up in the
+  judging script. Do not call the cached snapshot a live refresh.
+- DEMO/SAMPLE remains a separate fictional fixture. If used, retain **DEMO/SAMPLE
+  DATA — Synthetic demonstration values. Not current market data.** and never
+  describe its values as Sectors data.
+- Keep `.env`, API keys, Authorization headers, credentials, and hidden
+  reasoning out of frame.

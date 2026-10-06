@@ -1,27 +1,31 @@
 # NUSA Intelligence — Judging Video Script
 
-Maximum duration: 3:00. Target about 2:55 to leave a safe edit margin. Keep the
-source badge and full **DEMO/SAMPLE DATA — Synthetic demonstration values. Not
-current market data.** warning visible whenever sample financial results are
-shown. All DEMOBANK tickers and numeric values are fictional.
+Maximum duration: 3:00. Target exactly the timed sections below. Keep the
+source label **SECTORS CACHED SNAPSHOT — Sectors-origin data — Not a live
+refresh** visibly in frame whenever real financial results are shown. The
+snapshot was retrieved from Sectors; this recording is not a live refresh.
 
 | Time | Screen direction | Narration |
 | --- | --- | --- |
-| **0:00–0:20 — Problem** | Open on NUSA title; show Discover with source warning visible. | “Financial analysts have access to large amounts of company data, but finding which changes deserve a closer look takes repetitive screening, historical analysis, and peer comparison. An AI summary is not enough: the reasoning should be traceable to evidence.” |
-| **0:20–0:35 — Solution** | Show three app sections, then display the Core Workflow line. | “NUSA Intelligence is an autonomous AI research agent for unusual financial changes in Indonesian listed companies. Its current MVP focuses on banks. The workflow is Discover, Plan, Retrieve, Analyze, Compare, Verify, Explain—and remember useful session context.” |
-| **0:35–1:00 — Discovery** | Keep DEMO warning in frame. Click **Example: Find unusual financial changes among Indonesian banks**. Show all five results, then DEMOBANK5 at the top and its score/driver. | “This is the explicitly labeled DEMO/SAMPLE fixture: five fictional DEMOBANK companies with synthetic annual metrics. DEMOBANK5 ranks first in this configured sample because its asset change is most unusual relative to the other sample rows. This is a demonstration of the method, not a real market finding or current Sectors data.” |
-| **1:00–1:50 — Autonomous investigation** | Click **Investigate highest-ranked demo bank**, open INVESTIGATE, click **Run investigation**. Show progress; open Research plan and Evidence Ledger. | “Now I’ll investigate DEMOBANK5. NUSA resolves the request, creates and validates a structured plan, then calls only registered tools. Deterministic Python calculates the year-over-year metrics and peer baselines. The Evidence Ledger records periods, values, calculations, source, and IDs. Validation checks that evidence before synthesis. The optional language model receives validated evidence; it is not asked to invent or calculate financial numbers. With no model configured, NUSA uses its deterministic report template.” |
-| **1:50–2:20 — Report** | Show report summary, quantitative evidence, why-flagged section, references and limitations. | “The report explains the sample flag using the validated evidence: the primary driver, change period, peer comparison, and evidence references. Its limitations remain visible. A research-priority score is not a buy or sell recommendation, proof of misconduct, or a causal explanation.” |
-| **2:20–2:40 — Memory / peer comparison** | Click the comparison example, then **Run follow-up peer comparison**. Show resolved tickers, reused metric, and table. | “I’ll ask, ‘Compare this change with DEMOBANK2 and DEMOBANK3.’ Session memory resolves ‘this change’ to DEMOBANK5’s investigated assets metric. The registered comparison tool returns same-period evidence for the three fictional banks. These remain synthetic fixture values.” |
-| **2:40–2:55 — Architecture / Sectors** | Show README Mermaid diagram or repository architecture. | “The app keeps source selection, planning, tool routing, analytics, evidence validation, synthesis, and session memory as separate parts. Authenticated Sectors taxonomy access was confirmed, and the official Playground was reported to return Banks rows. Direct application access to the Companies Screener still returns HTTP 403, so this recording uses the disclosed fixture rather than claiming a live result.” |
-| **2:55–3:00 — Close** | NUSA logo/title and closing line. | “NUSA Intelligence turns financial screening into autonomous, evidence-grounded research.” |
+| **0:00–0:20 — Problem** | Open on NUSA and Discover. Keep the cached-source badge and not-live-refresh notice visible. | “Analysts have access to large volumes of financial data, but finding which changes deserve attention takes repeated screening, historical analysis, and peer comparison. Research also needs to show where its numbers came from.” |
+| **0:20–0:40 — NUSA solution** | Show the three sections and the Discover → Plan → Retrieve → Analyze → Compare → Verify → Explain workflow. | “NUSA Intelligence is an autonomous AI research agent for unusual changes among Indonesian listed banks. It combines the Sectors Financial API, deterministic analysis, custom tool orchestration, and an evidence ledger. The data shown here is a Sectors-origin cached snapshot—not a live refresh.” |
+| **0:40–1:10 — Discovery** | Click **Analyze Banks**. Show the 48-bank universe and ranked table. Highlight SUPA.JK, score, NII driver, change, and peer median. | “Sectors returned a universe of 48 IDX Banks with annual 2024 and 2025 values. SUPA.JK is the highest research priority in this snapshot. Its net interest income changed by 159.75%, compared with an eligible-peer median of approximately 1.69%. This ranking prioritizes research; it is not an investment recommendation or a misconduct finding.” |
+| **1:10–2:10 — Autonomous investigation** | Select SUPA.JK and run investigation. Show progress, expand the research plan, show registered tools, quantitative evidence, Evidence Ledger, validation result, and report. Keep source badge visible. | “Now I’ll investigate SUPA. NUSA resolves the request and validates a structured research plan. The router calls only registered tools. Deterministic Python calculates the annual changes and peer baselines. The Evidence Ledger records the values, periods, source, calculations, peer context, and eligibility flags. Evidence validation runs before the report is generated. The optional language model explains validated evidence; it is not asked to calculate or invent financial numbers. This report uses the deterministic template.” |
+| **2:10–2:35 — Peer comparison / memory** | Enter **Compare this change with BBSI.JK and BBHI.JK**; run follow-up. Show the resolved metric and three comparison rows. | “I’ll ask, ‘Compare this change with BBSI.JK and BBHI.JK.’ Structured session memory resolves ‘this change’ to net interest income. The snapshot shows SUPA at plus 159.75%, BBSI at plus 91.97%, and BBHI at plus 28.93%. All three values are from the same Sectors-origin cached snapshot, not a live refresh.” |
+| **2:35–2:50 — Architecture / Sectors** | Show the architecture diagram or Methodology section, then the cached-source status. | “NUSA separates provider selection, planning, tool execution, deterministic analytics, evidence validation, synthesis, and memory. The raw cached financial snapshot stays local and is intentionally excluded from the public repository.” |
+| **2:50–3:00 — Close** | Return to NUSA title and keep the source label visible. | “NUSA turns unusual financial changes into evidence-grounded research priorities—discover what changed, verify the evidence, and investigate what matters.” |
 
 ## Recording checks
 
-- Use DEMO/SAMPLE mode; do not switch to LIVE for the judging recording.
-- Keep the synthetic-data warning visible on Discovery, investigation, report,
-  and comparison shots.
-- Show only fictional DEMOBANK tickers in the synthetic journey.
-- Do not expose `.env`, API keys, credentials, or hidden reasoning.
-- Do not claim a live Sectors Screener response, current market data, fraud
-  detection, investment recommendations, or personalized advice.
+- Use **SECTORS CACHED SNAPSHOT** mode and keep **Sectors-origin data — Not a
+  live refresh** visible beside financial results.
+- Verify the displayed universe count is 48 and the top row is SUPA.JK before
+  recording; do not edit or stage the snapshot into Git.
+- Use the follow-up prompt exactly as written so memory resolves the NII metric.
+- Keep `.env`, API keys, credentials, account details, and hidden reasoning out
+  of frame.
+- Describe the score as research priority only. Do not imply fraud detection,
+  causality, a BUY/SELL recommendation, or personalized advice.
+- If the snapshot is unavailable in the recording environment, stop and obtain
+  an authorized local Sectors snapshot or explicitly switch to DEMO/SAMPLE and
+  disclose that it is synthetic; never conflate the two.

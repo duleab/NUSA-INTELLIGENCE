@@ -157,7 +157,7 @@ class SectorsClient:
         self.cache_dir = Path(cache_dir)
         self.timeout = timeout
         self.retries = retries
-        self.transport = transport or _urllib_transport
+        self.transport = transport or _requests_transport
         self.now = now
 
     def subsectors(self, force_refresh: bool = False) -> Any:

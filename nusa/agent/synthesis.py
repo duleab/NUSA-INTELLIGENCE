@@ -284,8 +284,8 @@ class LLMResearchSynthesizer:
                 for item in items if item.peer_median is not None or item.peer_count is not None
             ],
             why_flagged=[
-                f"{item.ticker} {item.metric}: observed change={_fmt(item.change)}; "
-                f"deviation={_fmt(item.deviation)} [{item.evidence_id}]"
+                f"{item.ticker} {item.metric}: {_evidence_change_label(item)}; "
+                f"deviation={_fmt(item.deviation)} {item.change_unit} [{item.evidence_id}]"
                 for item in items if item.change is not None or item.deviation is not None
             ],
             limitations=limitations,
@@ -341,12 +341,28 @@ def _validate_numeric_claims(result: dict[str, Any], evidence: EvidenceLedger) -
 
 def _evidence_line(item: Evidence) -> str:
     company = f" ({item.company_name})" if item.company_name else ""
+    change_label = _evidence_change_label(item)
+    unit_label = item.change_unit.replace("_", " ")
     return (
         f"{item.ticker}{company} {item.metric}, {item.period}: "
         f"previous={_fmt(item.previous_value)}, current={_fmt(item.current_value)}, "
-        f"change={_fmt(item.change)}, peer median={_fmt(item.peer_median)}, "
-        f"deviation={_fmt(item.deviation)} [{item.evidence_id}]"
+        f"{change_label}, peer median={_fmt(item.peer_median)} {unit_label}, "
+        f"deviation={_fmt(item.deviation)} {unit_label} [{item.evidence_id}]"
     )
+
+
+def _evidence_change_label(item: Evidence) -> str:
+    if not item.scoring_eligible:
+        amount = item.absolute_change if item.absolute_change is not None else item.change
+        reason = f" ({item.exclusion_reason})" if item.exclusion_reason else ""
+        unit_label = item.change_unit.replace("_", " ")
+        return (
+            f"absolute change={_fmt(amount)} {unit_label}; "
+            f"percentage change not used for scoring{reason}"
+        )
+    if item.change_unit == "percent":
+        return f"change={_fmt(item.change)}%"
+    return f"change={_fmt(item.change)} {item.change_unit.replace('_', ' ')}"
 
 
 def _fmt(value: Any) -> str:

@@ -4,9 +4,10 @@
 
 The current MVP focuses on Indonesian-listed banks. NUSA combines deterministic
 quantitative analysis with custom AI-agent orchestration and an evidence ledger.
-The judging journey uses visibly labeled synthetic DEMO/SAMPLE data. Direct
-application access to Sectors' Companies Screener remains unresolved; see
-[Known Limitations](#known-limitations).
+It supports three explicit data modes: **LIVE SECTORS DATA**, **SECTORS CACHED
+SNAPSHOT**, and **DEMO/SAMPLE**. The local judging environment uses a clearly
+identified Sectors-origin cached snapshot; it is not a live refresh. The raw
+snapshot is intentionally excluded from the public repository.
 
 ## Problem
 
@@ -17,12 +18,13 @@ verifiable evidence can also make unsupported financial claims.
 
 ## Solution
 
-NUSA combines a live-capable Sectors data-provider integration, deterministic
+NUSA combines the authenticated Sectors Financial API, deterministic
 quantitative analytics, and custom AI-agent orchestration to discover unusual
 financial changes and investigate them. Python calculates the metrics; the
 optional LLM helps resolve unsupported request wording and synthesize validated
-evidence. When the live Screener is unavailable, the demo uses an explicit
-synthetic fixture, never a silent live-to-demo substitution.
+evidence. A local Sectors-origin snapshot supports stable judging, while an
+explicit fictional fixture remains available when Sectors data is unavailable.
+The application never silently switches between source modes.
 
 ## Why NUSA
 
@@ -55,6 +57,7 @@ flowchart LR
     Intent --> Router[Validated plan + registered tool router]
     Router --> Provider[BankDataProvider]
     Provider --> Sectors[Sectors API: LIVE]
+    Provider --> Snapshot[SECTORS CACHED SNAPSHOT: Sectors-origin local data]
     Provider --> Fixture[DEMO/SAMPLE: synthetic fixture]
     Provider --> Analytics[Deterministic analytics]
     Analytics --> Ledger[Evidence Ledger + validator]
@@ -109,39 +112,59 @@ session-local and is not a vector database or durable store.
 
 ## Sectors Integration
 
-The live provider uses the authenticated Sectors client and the structured
-Companies Screener (`GET /v2/companies/`); it does not silently switch to demo
-data on an API error. The app also supports the taxonomy endpoint
-(`/v2/subsectors/`) and company-report retrieval through the existing client.
-API credentials are read from the environment or ignored `.env`, never shown in
-the interface or committed.
+NUSA has three distinct modes:
 
-**Current integration status:** authenticated `/v2/subsectors/` access was
-confirmed. The official Sectors Companies Screener Playground was reported to
-return the IDX Banks universe (48 companies). That Playground result is not an
-application response. Direct application `GET /v2/companies/` currently returns
-**HTTP 403**, and the cause remains unresolved. The application retains the
-LIVE provider architecture and propagates this error without switching to
-DEMO/SAMPLE. Consequently the submission journey uses the explicitly labeled
-synthetic fixture; its values are **not current market data**. See
-[`docs/sectors_api_analysis.md`](docs/sectors_api_analysis.md) for the API
-investigation.
+1. **LIVE SECTORS DATA** — the authenticated Sectors client retrieves data
+   directly from `GET /v2/companies/`. Live API errors are surfaced; no fixture
+   substitution occurs.
+2. **SECTORS CACHED SNAPSHOT** — previously retrieved Sectors-origin data is
+   read locally for reproducible analysis. The status shows its original
+   retrieval time and explicitly says it is not a live refresh.
+3. **DEMO/SAMPLE** — fictional banking companies and synthetic values for users
+   without Sectors credentials. These values are never represented as Sectors
+   data or current market data.
+
+The successful Companies Screener query returned **48 IDX Banks** and 2024/2025
+annual values for **earnings, net interest income, total assets, total equity,
+and ROA**. The judging environment uses a local Sectors-origin cached snapshot
+for stability. The raw financial snapshot is intentionally ignored by Git and
+excluded from the public repository; a repository clone does not contain this
+dataset.
+
+To populate a local snapshot with authorized Sectors access, set
+`SECTORS_API_KEY` in the ignored `.env`, make an authorized Screener request,
+save only its JSON response body (never headers or credentials) under the
+ignored `data/cache/sectors/` directory, then use the validated importer in
+[`docs/sectors_snapshot_ingestion.md`](docs/sectors_snapshot_ingestion.md).
+Record the original timezone-aware retrieval time and exact query. The importer
+creates a provenance envelope at
+`data/cache/sectors/banks_companies_screener.json` by default. The live provider
+and cached provider remain separate. See
+[`docs/sectors_api_analysis.md`](docs/sectors_api_analysis.md) for integration
+history and field analysis.
 
 ## Methodology
 
-The anomaly engine only considers annual metric pairs actually present in its
-input. For each eligible metric it calculates year-over-year percentage
-change, compares a bank against the median change of its other comparable
-banks, and ranks absolute deviations by cross-sectional percentile. It
-withholds a score unless at least four companies (the subject plus three peers)
-have comparable values. The score indicates **research priority**; it is not a
-prediction, investment rating, fraud signal, or causal claim.
+Real Sectors scoring uses annual earnings, net interest income, total assets,
+total equity, and ROA; NIM is excluded from the initial real-data workflow.
+Earnings, net interest income, assets, and equity use
+`(current - previous) / abs(previous) × 100`. ROA is stored as a decimal
+fraction and uses `(current - previous) × 100` percentage points. A sign
+transition, zero prior value, or prior value below 1% of the median absolute
+valid prior-year value is excluded from percentage-based scoring and explicitly
+flagged with its absolute monetary change. No values are imputed.
 
-Annual fields requested from the Screener are documented candidates, not
-confirmed live coverage. The bundled fixture contains five fictional
-`DEMOBANK1`–`DEMOBANK5` companies with synthetic 2022–2025 revenue, earnings,
-assets, equity, ROA, and ROE values in demonstration units. These values are
-not Sectors data and do not describe real companies.
+Eligible metrics use leave-one-out peer medians, peer-relative deviation, and
+percentile contributions. The 0–100 research-priority composite is adjusted by
+eligible-metric coverage; a missing or ineligible metric is not assigned a zero
+contribution. At least four comparable companies are required for a metric.
+This is a deterministic, transparent ranking: **no black-box ML anomaly model
+is used**. The score is not investment advice, a BUY/SELL signal, or a
+misconduct/fraud assessment.
+
+The separate DEMO/SAMPLE fixture contains five fictional `DEMOBANK` companies
+with synthetic annual metrics. Those values are not Sectors data and do not
+describe real companies.
 
 ## Evidence Grounding
 
@@ -158,8 +181,10 @@ claims fall back to a deterministic evidence-based summary.
 ## Screenshots
 
 Screenshots are to be captured manually; none are claimed as included yet. See
-[`docs/screenshots.md`](docs/screenshots.md) for the shot list, crop guidance,
-and captions. Every sample-data screenshot must retain its prominent warning.
+[`docs/screenshots.md`](docs/screenshots.md) for the real cached-data shot list,
+crop guidance, and captions. Keep **SECTORS CACHED SNAPSHOT — Sectors-origin
+data — Not a live refresh** visible on real-data screenshots. DEMO/SAMPLE
+screenshots must retain their separate synthetic-data warning.
 
 ## Installation
 
@@ -194,36 +219,47 @@ screenshots, test output, or Git.
 streamlit run app.py
 ```
 
-The app starts in DEMO/SAMPLE mode. Select **LIVE — Sectors** explicitly to use
-the configured API. Live API failures are surfaced; no fixture substitution is
-performed. The UI caches discovery and universe reads for five minutes, while
-the existing Sectors client retains its own response-cache behavior.
+If the validated local Sectors snapshot exists, the app defaults to **SECTORS
+CACHED SNAPSHOT** for a reproducible demo. Otherwise, choose **LIVE SECTORS** or
+**DEMO/SAMPLE** explicitly; the app reports that no cached dataset is present
+and does not substitute one. Live API failures are surfaced. The UI caches
+discovery and universe reads for five minutes, while the existing Sectors
+client retains its own response-cache behavior.
 
 Run the test suite with:
 
 ```powershell
-python -m unittest discover -s tests -v
+python -u -m unittest discover -s tests
 ```
 
 ## Tests
 
-The repository's current full suite contains 59 tests. Run the command above
+The repository's current full suite contains 92 tests. Run the command above
 from the project root before recording or submitting.
 
-## Demo Mode
+## Sectors Cached-Snapshot Demo
 
-1. Keep the source selector on **DEMO/SAMPLE** and confirm the warning:
-   **Synthetic demonstration values. Not current market data.**
-2. In **DISCOVER**, click **Example: Find unusual financial changes among
-   Indonesian banks**; this runs Discovery (or click **Analyze Banks**).
-3. Click **Investigate highest-ranked demo bank** to preselect `DEMOBANK5`.
-   Open **INVESTIGATE** and click **Run investigation** to see the plan, tools,
-   deterministic analysis, evidence validation, and report.
-4. Click the example prompt **Compare this change with DEMOBANK2 and DEMOBANK3**
-   and then **Run follow-up peer comparison**. Session memory resolves “this
-   change” to the investigation's primary-driver metric and compares the three
-   fictional banks using fixture evidence.
-5. Open **METHODOLOGY** for scoring, evidence, agent, and disclaimer details.
+1. Confirm the badge says **SECTORS CACHED SNAPSHOT** and the notice identifies
+   Sectors-origin data and says **Not a live refresh**.
+2. In **DISCOVER**, click **Analyze Banks**. The snapshot contains 48 IDX Banks;
+   `SUPA.JK` is the highest research priority in this validated snapshot.
+3. Investigate `SUPA.JK`. Its primary signal is net interest income **+159.75%**
+   against a peer median of approximately **+1.69%**. Review the research plan,
+   tool execution, evidence ledger, validation, and report.
+4. Ask **Compare this change with BBSI.JK and BBHI.JK**. Memory resolves the
+   metric to net interest income: SUPA **+159.75%**, BBSI **+91.97%**, BBHI
+   **+28.93%**.
+5. Open **METHODOLOGY** for formulas, source modes, limitations, and disclaimer.
+
+The exact underlying retrieval timestamp appears in the app. A cached snapshot
+is reproducible Sectors-origin data, not a live market refresh.
+
+## DEMO/SAMPLE Fallback
+
+Choose **DEMO/SAMPLE** only when the fictional fixture is desired. Confirm the
+warning **DEMO/SAMPLE DATA — Synthetic demonstration values. Not current market
+data.** The bundled fixture contains `DEMOBANK1`–`DEMOBANK5`; it remains fully
+separate from the Sectors snapshot.
 
 The bundled fixture contains five fictional `DEMOBANK1`–`DEMOBANK5` symbols and
 synthetic annual values for 2022–2025 (revenue, earnings, assets, equity, ROA,
@@ -233,16 +269,14 @@ for the guided Discovery → Investigate → peer comparison journey.
 
 ## Known Limitations
 
-- Direct live `GET /v2/companies/` access from the Python client remains HTTP
-  403, despite the reported successful Playground query. Live Discover,
-  Investigate, and Compare therefore remain unverified end to end.
-- The bundled DEMO/SAMPLE fixture is small, fictional, and uses synthetic
-  2022–2025 demonstration values. It demonstrates the orchestration workflow
-  but cannot demonstrate real BBRI/BBCA/BMRI financial data or a live-market
-  conclusion.
-- Historical financial coverage and available metrics depend on the provider
-  response. The application abstains when required peer/history evidence is
-  insufficient.
+- The judging snapshot is cached and does not refresh live. Its raw financial
+  file is intentionally excluded from Git; repository clones do not include it.
+- LIVE mode requires authorized Sectors credentials and depends on API
+  availability. Errors are surfaced without fallback.
+- The separate DEMO/SAMPLE fixture remains synthetic and cannot support claims
+  about real companies or current market values.
+- Historical coverage and available metrics depend on the provider response.
+  The application abstains when required peer/history evidence is insufficient.
 - LLM synthesis and unresolved-request interpretation require a configured
   compatible provider; offline template summaries remain available.
 - Session memory lasts only for the active Streamlit session.
@@ -268,7 +302,7 @@ source, period, coverage, and context independently before making decisions.
 - **Event:** Sectors Hackathon 2026
 - **Track:** Track 01 — AI Agents & Assistants
 - **MVP scope:** IDX Banking
-- **Submission deadline:** September 30, 2026 at 23:59 WIB
-- **Submission readiness:** local repository prepared; live Companies Screener
-  access remains outstanding. Screenshots and video links must be added after
-  manual capture/recording.
+- **Submission deadline:** October 8, 2026 at 23:59 WIB
+- **Submission readiness:** real Sectors cached-snapshot workflow validated
+  locally; snapshot remains excluded from the public repository. Screenshots
+  and video links must be added after manual capture/recording.

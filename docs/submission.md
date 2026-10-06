@@ -10,7 +10,7 @@ NUSA Intelligence combines a Sectors data-provider integration, deterministic qu
 
 ## C. Short project description (~100 words)
 
-NUSA Intelligence is an autonomous AI research agent for unusual financial changes in Indonesian listed companies, with an MVP focused on banks. It ranks eligible annual changes in a bounded universe, investigates a selected company through a structured plan and registered tools, and compares validated metrics with available peers. Deterministic Python calculates the financial values; an Evidence Ledger preserves periods, sources, calculations, and peer context before report generation. Optional LLM synthesis explains validated evidence, while a deterministic template keeps the application useful without an LLM credential. The demo uses five fictional DEMOBANK symbols and synthetic values, clearly labeled as not current market data. Live Sectors Screener access remains unresolved.
+NUSA Intelligence is an autonomous AI research agent for unusual financial changes in Indonesian listed banks. The Sectors Companies Screener works in the authenticated client and returned 48 IDX Banks with annual 2024/2025 earnings, net interest income, total assets, total equity, and ROA. The judging workflow uses a local Sectors-origin cached snapshot for reproducibility; its badge says it is not a live refresh. Deterministic Python calculates and ranks eligible changes, and an Evidence Ledger validates their source and peer context before the report. Optional LLM synthesis explains validated evidence, while a deterministic template works without model credentials. A separate DEMO/SAMPLE fixture remains available and is explicitly synthetic.
 
 ## D. Full project description (~250 words)
 
@@ -18,7 +18,7 @@ NUSA Intelligence is an autonomous AI research agent that helps analysts identif
 
 Bounded Discovery ranks annual metric changes when the selected source has enough comparable historical and peer data. A structured plan runs through an explicit allowlist of tools. Deterministic Python normalizes data and calculates trends, anomaly scores, and peer comparisons. The Evidence Ledger records tickers, values, periods, sources, calculations, and peer baselines; an Evidence Validator checks records before synthesis. Optional LLM synthesis explains evidence but cannot calculate or originate financial numbers, and cannot run model-generated code. Structured session memory resolves follow-ups such as “this change.” Without a configured model provider, NUSA returns a deterministic evidence-based template.
 
-The `BankDataProvider` separates authenticated Sectors access from explicitly selected fixture data. Access to `/v2/subsectors/` was confirmed, and the official Companies Screener Playground was reported to return IDX Banks. Direct app access to `GET /v2/companies/` returns HTTP 403; its cause is unresolved, so the judging journey uses the bundled fixture. Its five DEMOBANK symbols and values are synthetic, not current market data or Sectors observations.
+The `BankDataProvider` separates three explicit source modes: direct **LIVE SECTORS DATA**, **SECTORS CACHED SNAPSHOT**, and fictional **DEMO/SAMPLE**. Direct authenticated `GET /v2/companies/` is working and returned 48 Banks with 2024/2025 annual fields. For a stable judging run, NUSA reads a Sectors-origin cached snapshot and shows its original retrieval time plus “Not a live refresh.” The raw snapshot is ignored by Git and intentionally excluded from the public repository; clones do not include the real financial dataset. Authorized users can populate a local copy using the documented response importer in [`sectors_snapshot_ingestion.md`](sectors_snapshot_ingestion.md). Earlier 403 attempts are historical and do not describe current integration status.
 
 The plan, tool trace, calculations, evidence references, peer context, and limitations are inspectable. NUSA is a research tool—not a trading system, fraud detector, or source of personalized investment advice.
 
@@ -32,15 +32,27 @@ NUSA is not simply an LLM connected to Sectors. The implemented custom agent inc
 
 ## G. Sectors usage explanation
 
-The live provider uses the existing authenticated Sectors client and remains available as an explicit LIVE mode. Authenticated `/v2/subsectors/` access was confirmed. A successful Banks Companies Screener Playground result was reported separately; it is not an application result. Direct Python `GET /v2/companies/` returned HTTP 403 in the controlled attempts, and the cause has not been established. Live API failures are surfaced without silently switching to fixture data. The submission demo therefore uses the explicitly labeled synthetic fixture. See [`sectors_api_analysis.md`](sectors_api_analysis.md) for details.
+The authenticated Sectors client successfully retrieves the Companies Screener. A Banks query returned 48 IDX companies and annual 2024/2025 values for earnings, net interest income, total assets, total equity, and ROA. The judging demo reads a validated Sectors-origin snapshot locally for stability; the snapshot is not a live refresh and is deliberately excluded from the public repository. The client also supports explicit live retrieval when a user configures authorized credentials. Any live failure is surfaced, never replaced silently with DEMO/SAMPLE. See [`sectors_api_analysis.md`](sectors_api_analysis.md) and [`sectors_snapshot_ingestion.md`](sectors_snapshot_ingestion.md) for integration and local import details.
 
 ## H. Technical innovation summary
 
-NUSA combines a bounded bank-data provider interface with custom agent orchestration and deterministic, explainable financial analysis. It routes requests only through registered tools, keeps calculations outside the LLM, validates metric evidence before synthesis, and retains compact structured memory for contextual comparisons. When the Screener is unavailable, the demo fixture enables repeatable judging without representing synthetic data as live data.
+NUSA combines a bounded bank-data provider interface with custom agent orchestration and deterministic, explainable financial analysis. It routes requests only through registered tools, keeps calculations outside the LLM, validates metric evidence before synthesis, and retains compact structured memory for contextual comparisons. The real-data judging journey is repeatable because it uses a labeled Sectors cached snapshot; no black-box ML anomaly model is used.
+
+## Data and methodology
+
+For earnings, net interest income, total assets, and total equity, the ordinary
+change is `(current - previous) / abs(previous) × 100`. ROA is stored as a
+decimal fraction and changes in percentage points: `(current - previous) × 100`.
+Sign transitions, zero prior values, and sufficiently small prior values
+(below 1% of the median absolute prior-year value) are excluded from percentage
+scoring and explicitly flagged; absolute monetary changes remain in evidence.
+Eligible metrics use leave-one-out peer medians and percentile deviation
+contributions. The 0–100 score is a research-priority ranking, not investment
+advice, a BUY/SELL signal, or a misconduct/fraud assessment.
 
 ## I. Current limitations
 
-- Direct application `GET /v2/companies/` currently returns HTTP 403; live discovery and the end-to-end live workflow are not verified.
+- The judging snapshot is cached rather than live. It is not included in public repository clones; obtain authorized Sectors data locally to reproduce the real-data journey.
 - The five-company DEMOBANK fixture is fictional and synthetic. Its values are not current market data or Sectors observations.
 - Available metrics and periods depend on provider coverage; the app abstains when required comparisons are unsupported.
 - Without an optional compatible LLM provider, report synthesis uses a deterministic template.

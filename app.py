@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -14,6 +15,12 @@ from nusa.agent.session_memory import ResearchSessionMemory
 from nusa.agent.synthesis import LLMResearchSynthesizer, create_llm_provider_from_env
 from nusa.discovery.workflow import discover_banks
 from nusa.providers import BankDataProvider, create_bank_data_provider
+from nusa.providers.sectors_snapshot import DEFAULT_SECTORS_SNAPSHOT_PATH
+from nusa.ui.source_modes import (
+    format_excluded_metric_flags,
+    format_source_status,
+    source_mode_options,
+)
 
 
 load_dotenv()
@@ -42,6 +49,8 @@ st.markdown(
         display: inline-block; padding: .36rem .7rem; font-size: .77rem; font-weight: 750; }}
       .nusa-badge-demo {{ color: #854d0e; background: #fef3c7; border-radius: 999px;
         display: inline-block; padding: .36rem .7rem; font-size: .77rem; font-weight: 800; }}
+      .nusa-badge-cached {{ color: #1e3a8a; background: #dbeafe; border-radius: 999px;
+        display: inline-block; padding: .36rem .7rem; font-size: .77rem; font-weight: 800; }}
       div[data-testid="stTabs"] button {{ font-weight: 700; }}
       .stButton button[kind="primary"] {{ background: {_TEAL}; border-color: {_TEAL}; }}
     </style>
@@ -52,6 +61,11 @@ st.markdown(
 
 @st.cache_resource(show_spinner=False)
 def _provider(mode: str) -> BankDataProvider:
+    if mode == "cached_sectors":
+        return create_bank_data_provider(
+            mode,
+            snapshot_path=DEFAULT_SECTORS_SNAPSHOT_PATH,
+        )
     return create_bank_data_provider(mode)
 
 
@@ -82,33 +96,40 @@ def _set_status(status: dict[str, Any]) -> None:
 
 def _show_data_status(mode: str) -> None:
     status = st.session_state.get("nusa_data_status", {})
-    configured_live = mode == "live"
-    is_live = bool(status.get("is_live", configured_live))
-    label = "LIVE" if is_live else "DEMO/SAMPLE"
-    badge_class = "nusa-badge-live" if is_live else "nusa-badge-demo"
-    source = status.get("source", "Sectors Financial API" if is_live else "Bundled sample fixture")
-    warning = status.get("warning")
+    if mode == "cached_sectors" and not status:
+        try:
+            status = asdict(_provider(mode).status)
+        except (OSError, ValueError):
+            status = {}
     retrieved = status.get("retrieved_at")
-    status_text = f"{source} · {status.get('mode', mode)}"
-    if retrieved:
-        status_text += f" · Retrieved {retrieved}"
+    display = format_source_status(mode, retrieved)
+    badge_class = {
+        "live": "nusa-badge-live",
+        "cached_sectors": "nusa-badge-cached",
+        "demo": "nusa-badge-demo",
+        "fixture": "nusa-badge-demo",
+    }[mode]
     st.markdown(
-        f'<span class="{badge_class}">{label}</span> &nbsp; '
-        f'<span style="color:{_MUTED}">{status_text}</span>',
+        f'<span class="{badge_class}">{display["badge"]}</span> &nbsp; '
+        f'<span style="color:{_MUTED}">{status.get("source", display["message"])}</span>',
         unsafe_allow_html=True,
     )
-    if not is_live:
-        st.warning(
-            "DEMO/SAMPLE DATA — Synthetic demonstration values. Not current market data.",
-            icon="⚠️",
-        )
-    elif warning:
-        st.caption(f"Source note: {warning}")
+    if mode == "cached_sectors":
+        st.info(display["message"])
+    elif mode in {"demo", "fixture"}:
+        st.warning(display["message"], icon="⚠️")
+    else:
+        warning = status.get("warning")
+        st.caption(display["message"] if not warning else f"{display['message']} {warning}")
 
 
 def _company_label(row: dict[str, Any]) -> str:
     name = row.get("company_name") or row.get("ticker", "Unknown company")
     return f"{name} · {row.get('ticker', '')}"
+
+
+def _unit_label(unit: str) -> str:
+    return "percentage points" if unit == "percentage_points" else unit
 
 
 st.markdown('<div class="nusa-kicker">Indonesian banking research</div>', unsafe_allow_html=True)
@@ -121,13 +142,22 @@ st.markdown(
 
 with st.sidebar:
     st.markdown("### Research settings")
+    snapshot_available = Path(DEFAULT_SECTORS_SNAPSHOT_PATH).is_file()
+    source_options = source_mode_options(snapshot_available=snapshot_available)
+    source_labels = dict(source_options)
     source_choice = st.selectbox(
         "Data source",
-        ["DEMO/SAMPLE", "LIVE — Sectors"],
+        [mode for mode, _ in source_options],
+        format_func=lambda mode: source_labels[mode],
         index=0,
-        help="Live requests use the authenticated Sectors API. Demo is the safe default.",
+        help="Choose a cached Sectors snapshot, an explicit live API source, or DEMO/SAMPLE.",
     )
-    source_mode = "live" if source_choice.startswith("LIVE") else "demo"
+    source_mode = source_choice
+    if not snapshot_available:
+        st.info(
+            "No local Sectors snapshot is available. Select LIVE SECTORS or DEMO/SAMPLE; "
+            "no cached real data is being substituted."
+        )
     st.caption(
         "Live API access requires `SECTORS_API_KEY` in the environment or ignored .env file."
     )
@@ -135,6 +165,7 @@ with st.sidebar:
         st.session_state["nusa_cache_version"] = st.session_state.get("nusa_cache_version", 0) + 1
         _cached_discovery.clear()
         _cached_universe.clear()
+        _provider.clear()
         st.rerun()
 
 if st.session_state.get("nusa_source_mode") != source_mode:
@@ -179,11 +210,8 @@ with discover_tab:
             st.session_state["nusa_discovery_rows"] = ranked_rows
             st.session_state["nusa_company_rows"] = company_rows
             _set_status(status)
-            if not status.get("is_live"):
-                st.warning(
-                    "DEMO/SAMPLE DATA — Synthetic demonstration values. Not current market data.",
-                    icon="⚠️",
-                )
+            if source_mode == "demo":
+                st.warning(format_source_status("demo")["message"], icon="⚠️")
         except Exception as error:
             failed_status = asdict(_provider(source_mode).status)
             _set_status(failed_status)
@@ -210,13 +238,33 @@ with discover_tab:
                 "company_name": "Company",
                 "primary_driver": "Primary driver",
                 "score": "Research priority score",
+                "eligible_metric_count": "Eligible metrics",
+                "primary_change": "Driver change",
+                "primary_change_unit": "Change unit",
+                "primary_peer_median": "Peer median",
+                "primary_deviation": "Peer deviation",
             }
-        )[["Ticker", "Company", "Primary driver", "Research priority score"]]
+        )[[
+            "Ticker", "Company", "Primary driver", "Driver change", "Change unit",
+            "Peer median", "Peer deviation", "Research priority score", "Eligible metrics",
+        ]]
+        display["Change unit"] = display["Change unit"].replace(
+            {"percentage_points": "percentage points"}
+        )
+        display["Excluded metric flags"] = ranked_frame["excluded_metric_flags"].map(
+            format_excluded_metric_flags
+        )
         st.dataframe(display, hide_index=True, width="stretch")
         st.caption(
             "Scores rank unusual peer-relative changes for research; they are not "
             "recommendations or misconduct assessments."
         )
+        flagged = ranked_frame.loc[ranked_frame["excluded_metric_flags"].map(bool)]
+        if not flagged.empty:
+            st.caption(
+                "Some metric changes are excluded from scoring due to sign transitions, "
+                "zero denominators, or small bases; those changes remain flagged in the detail."
+            )
 
         selector_rows = ranked_frame.to_dict(orient="records")
         chosen_ticker = st.selectbox(
@@ -383,11 +431,17 @@ with investigate_tab:
                     index=[item.period.split(" to ")[0], item.period.split(" to ")[1]],
                 )
                 st.line_chart(history, width="stretch")
-                peer_change = pd.DataFrame(
-                    {"Year-over-year change (%)": [item.change, item.peer_median]},
-                    index=[item.ticker, "Peer median"],
-                )
-                st.bar_chart(peer_change, width="stretch")
+                if item.scoring_eligible:
+                    peer_change = pd.DataFrame(
+                        {f"Change ({_unit_label(item.change_unit)})": [item.change, item.peer_median]},
+                        index=[item.ticker, "Peer median"],
+                    )
+                    st.bar_chart(peer_change, width="stretch")
+                else:
+                    st.caption(
+                        f"Not scored: {item.exclusion_reason}. Absolute monetary change is "
+                        "retained; percentage change is not used for scoring."
+                    )
 
             evidence_frame = pd.DataFrame([item.to_dict() for item in evidence_items])
             with st.expander("Evidence ledger", expanded=False):
@@ -397,10 +451,12 @@ with investigate_tab:
                     "Ticker": item.ticker,
                     "Metric": item.metric,
                     "Period": item.period,
-                    "Change (%)": item.change,
-                    "Peer median (%)": item.peer_median,
+                    f"Change ({_unit_label(item.change_unit)})": item.change,
+                    f"Peer median ({_unit_label(item.change_unit)})": item.peer_median,
                     "Peers": item.peer_count,
-                    "Deviation (pp)": item.deviation,
+                    f"Deviation ({_unit_label(item.change_unit)})": item.deviation,
+                    "Scoring eligible": item.scoring_eligible,
+                    "Exclusion reason": item.exclusion_reason,
                     "Evidence ID": item.evidence_id,
                 }
                 for item in evidence_items
@@ -474,14 +530,19 @@ with methodology_tab:
     st.subheader("How NUSA builds a research priority")
     st.markdown(
         """
-        **Data source.** Live mode uses the authenticated Sectors Financial API. Demo mode uses
-        the bundled fictional fixture and is never represented as current market data. API and
-        coverage limitations are surfaced rather than silently substituted.
+        **Data source.** LIVE SECTORS uses the authenticated Sectors Financial API. SECTORS
+        CACHED SNAPSHOT uses a local Sectors-origin response with its original retrieval time;
+        it is not a live refresh. DEMO/SAMPLE uses the bundled fictional fixture and is never
+        represented as current market data. Source modes never substitute for one another.
 
-        **Deterministic analytics.** The existing Discovery pipeline uses only annual fields
-        returned by the provider. It calculates year-over-year changes, compares each bank with
-        the median of comparable peers, and ranks absolute deviations by cross-sectional
-        percentile. Insufficient company or peer coverage yields no score.
+        **Deterministic analytics.** Real Sectors ranking initially uses annual earnings,
+        net interest income, assets, equity, and ROA; NIM is excluded. Monetary changes use
+        `(current - previous) / abs(previous) × 100`. A sign transition, zero prior value, or
+        prior value below 1% of the median absolute prior-year value is retained as an absolute
+        change but excluded from percentage scoring. ROA is reported in percentage points.
+        Eligible changes use leave-one-out peer medians and percentile deviation contributions.
+        The 0–100 composite is adjusted by eligible-metric coverage, so missing metrics are not
+        treated as zero evidence and partial coverage is visible.
 
         **Evidence grounding.** Every supported quantitative finding is carried in the Evidence
         Ledger with its source, endpoint, period, calculation, values, and data mode. The report
