@@ -18,8 +18,16 @@ def format_excluded_metric_flags(flags: object) -> str:
     """Render scorer exclusions compactly in the Discovery results table."""
     if not isinstance(flags, list):
         return "—"
+    reason_labels = {
+        "SIGN_TRANSITION": "sign transition",
+        "ZERO_BASE": "zero prior value",
+        "SMALL_BASE": "small prior-year base",
+        "INSUFFICIENT_COMPARABLE_COMPANIES": "insufficient peer coverage",
+        "MISSING_OR_NON_NUMERIC_VALUE": "missing annual value",
+    }
     labels = [
-        f"{item['metric']}: {item['reason']}"
+        f"{str(item['metric']).replace('_', ' ').title()} · excluded from % scoring — "
+        f"{reason_labels.get(str(item['reason']), str(item['reason']).replace('_', ' ').lower())}"
         for item in flags
         if isinstance(item, dict) and item.get("metric") and item.get("reason")
     ]
