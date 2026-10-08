@@ -2,6 +2,8 @@ import unittest
 from types import SimpleNamespace
 
 from nusa.agent.orchestration import (
+    DeepInvestigationOrchestrator,
+    DeepInvestigationResult,
     IntentResolver,
     ResearchOrchestrator,
     ResearchPlanner,
@@ -358,6 +360,52 @@ class RoutingAndOrchestrationTests(unittest.TestCase):
         registry = ToolRegistry()
         with self.assertRaises(UnsupportedToolError):
             registry.get("__import__('os').system('whoami')")
+
+    def test_answer_followup_succeeds_on_valid_evidence(self):
+        provider = InMemoryProvider()
+        orchestrator = ResearchOrchestrator(provider)
+        investigation = orchestrator.run("Investigate DEMOBANK5")
+        synthesis = orchestrator.answer_followup(
+            "What is the key takeaway?", investigation
+        )
+        self.assertIsNotNone(synthesis)
+        self.assertTrue(bool(synthesis.executive_summary))
+
+    def test_deep_investigation_orchestrator_runs_and_records_decisions(self):
+        provider = InMemoryProvider()
+        orchestrator = DeepInvestigationOrchestrator(provider)
+        discovery_rows = provider.discovery.ranked.to_dict(orient="records")
+
+        result = orchestrator.run_deep("DEMOBANK5", discovery_rows)
+
+        self.assertIsInstance(result, DeepInvestigationResult)
+        self.assertEqual(result.ticker, "DEMOBANK5")
+        self.assertGreater(len(result.decisions), 0)
+        self.assertIsNotNone(result.synthesis)
+        self.assertTrue(bool(result.synthesis.executive_summary))
+        self.assertIsInstance(result.decision_log, list)
+        self.assertGreater(len(result.decision_log), 0)
+        first_decision = result.decision_log[0]
+        self.assertIn("step", first_decision)
+        self.assertIn("observation", first_decision)
+        self.assertIn("decision", first_decision)
+        self.assertIn("reason", first_decision)
+        events = [e.event for e in result.trace.events]
+        self.assertIn("DEEP_INVESTIGATION_STARTED", events)
+        self.assertIn("DEEP_INVESTIGATION_COMPLETED", events)
+
+    def test_tool_get_company_evidence_falls_back_when_company_report_fails(self):
+        provider = InMemoryProvider()
+        def fail_get_company_data(ticker):
+            raise RuntimeError("401 Unauthorized simulated")
+        provider.get_company_data = fail_get_company_data
+
+        orchestrator = ResearchOrchestrator(provider)
+        investigation = orchestrator.run("Investigate DEMOBANK1")
+        self.assertEqual(investigation.resolved_intent.intent, "INVESTIGATE")
+        company_output = investigation.outputs["get_company_evidence"]
+        self.assertIn("screener_row", company_output.value["company"])
+        self.assertIn("fallback", company_output.status.source)
 
 
 if __name__ == "__main__":

@@ -46,7 +46,7 @@ class SourceModeTests(unittest.TestCase):
             format_excluded_metric_flags(
                 [{"metric": "earnings", "reason": "SIGN_TRANSITION"}]
             ),
-            "earnings: SIGN_TRANSITION",
+            "Earnings · excluded from % scoring — sign transition",
         )
 
 
