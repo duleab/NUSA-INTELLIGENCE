@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bniiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="url(#bniiGrad)"/>
+  <polygon points="50,22 76,40 68,74 32,74 24,40" fill="#1E293B"/>
+  <polygon points="50,30 70,44 64,68 36,68 30,44" fill="#F59E0B"/>
+  <circle cx="42" cy="48" r="4" fill="#FFFFFF"/>
+  <circle cx="58" cy="48" r="4" fill="#FFFFFF"/>
+  <polygon points="50,56 46,62 54,62" fill="#FFFFFF"/>
+</svg>

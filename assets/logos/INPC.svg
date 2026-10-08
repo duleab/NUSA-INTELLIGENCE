@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="inpcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="url(#inpcGrad)"/>
+  <path d="M 20 40 L 50 26 L 80 40 L 50 78 Z" fill="none" stroke="#F59E0B" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M 32 46 L 50 36 L 68 46 L 50 68 Z" fill="#FFFFFF"/>
+</svg>

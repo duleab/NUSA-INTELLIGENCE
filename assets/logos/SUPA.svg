@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="supaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#9333EA"/>
+      <stop offset="100%" stop-color="#4C1D95"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="url(#supaGrad)"/>
+  <path d="M 66 33 C 62 26 52 24 44 27 C 35 30 31 38 33 46 C 35 55 46 58 56 61 C 67 64 70 71 68 78 C 66 85 57 88 48 86 C 38 84 32 78 31 72" fill="none" stroke="#FFFFFF" stroke-width="9.5" stroke-linecap="round"/>
+</svg>
