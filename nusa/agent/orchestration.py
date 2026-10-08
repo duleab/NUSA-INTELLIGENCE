@@ -1,7 +1,27 @@
-"""Small deterministic agent loop with an explicit safe-tool allowlist.
+"""Bounded-autonomy agent loop with an explicit safe-tool allowlist.
 
-This module intentionally has no LLM or code-execution integration. Plans are
-created from fixed templates and operational traces omit internal reasoning.
+Architecture
+-----------
+NUSA uses a *bounded autonomy* model:
+
+1. **Deterministic path (default).** The ``IntentResolver`` parses the
+   request with regex rules.  The ``ResearchPlanner`` emits a fixed,
+   validated plan.  No model is called.
+
+2. **LLM planner fallback.** When the resolver raises
+   ``UnsupportedIntentError``, ``LLMResearchSynthesizer.plan_from_request``
+   proposes a plan.  That plan is *always* validated against the
+   ``ToolRegistry`` allowlist before any tool is called.  The model cannot
+   invent or access tools outside the allowlist.
+
+3. **Autonomous deep investigation** (``DeepInvestigationOrchestrator``).
+   A deterministic policy observes the evidence after each tool call,
+   decides the next action with an explicit reason, and stops itself.  No
+   model is required; the policy is encoded in ``nusa.agent.policy``.
+
+All tool calls go through ``ToolRouter → ToolRegistry → EvidenceValidator``
+regardless of which path produced the plan.  Financial numbers are never
+invented: every claim in the synthesis is backed by a validated evidence ID.
 """
 
 from __future__ import annotations
@@ -111,7 +131,17 @@ class ResearchPlan:
 
 
 class ResearchPlanner:
-    """Create fixed, inspectable plans; there is no model-generated planning."""
+    """Create fixed, inspectable plans for the three core MVP intents.
+
+    When the ``IntentResolver`` successfully parses a request, this class
+    emits a deterministic plan with no model involvement.  For requests that
+    fall outside the three intents, ``ResearchOrchestrator`` delegates to
+    ``LLMResearchSynthesizer.plan_from_request``, which proposes a plan that
+    is then validated by ``validate_plan`` before any tool is called.
+
+    For autonomous multi-step investigation, use
+    ``DeepInvestigationOrchestrator`` instead.
+    """
 
     def __init__(self, resolver: IntentResolver | None = None) -> None:
         self.resolver = resolver or IntentResolver()
@@ -487,13 +517,218 @@ class ResearchOrchestrator:
 
     def answer_followup(self, question: str, previous: ResearchRunResult) -> ResearchSynthesis:
         """Answer against a prior run's validated ledger; this does not fetch new data."""
-        if previous.evidence_ledger.validate():
+        if previous.evidence_ledger.validate():  # validate() returns errors dict; truthy = has errors
             raise EvidenceValidationError("Prior evidence failed validation")
         return self.synthesizer.answer_followup(
             question,
             previous.evidence_ledger,
             previous.synthesis,
             data_source=previous.synthesis_context.get("data_source"),
+        )
+
+
+@dataclass(frozen=True)
+class DeepInvestigationResult:
+    """Result of an autonomous multi-step deep investigation."""
+
+    ticker: str
+    decisions: list  # list[AgentDecision] from nusa.agent.policy
+    evidence_ledger: EvidenceLedger
+    outputs: dict[str, ToolOutput]
+    synthesis: "ResearchSynthesis"
+    trace: ExecutionTrace
+    peer_tickers_selected: list[str]
+
+    @property
+    def decision_log(self) -> list[dict[str, Any]]:
+        """Serialisable log of every agent decision."""
+        return [
+            {
+                "step": d.step,
+                "observation": d.observation,
+                "decision": d.decision,
+                "reason": d.reason,
+                "tool": d.tool,
+                "tool_arguments": d.tool_arguments,
+                "limitation": d.limitation,
+            }
+            for d in self.decisions
+        ]
+
+
+class DeepInvestigationOrchestrator:
+    """Autonomous observe → decide → act investigation loop.
+
+    This is the agentic layer on top of ``ResearchOrchestrator``.  After
+    the standard INVESTIGATE plan runs, a deterministic policy (encoded in
+    ``nusa.agent.policy``) observes the evidence, picks size-matched peers
+    automatically, decides which tool to call next and records *why*, and
+    stops itself when evidence is sufficient or the step budget is reached.
+
+    No LLM is required.  All tool calls go through the same ``ToolRegistry``
+    allowlist and ``EvidenceValidator`` as the standard orchestrator.
+    """
+
+    def __init__(
+        self,
+        provider: BankDataProvider,
+        *,
+        synthesizer: LLMResearchSynthesizer | None = None,
+        session_memory: ResearchSessionMemory | None = None,
+    ) -> None:
+        # Import here to avoid circular imports at module level
+        from nusa.agent.policy import (  # noqa: PLC0415
+            build_deep_investigation_steps,
+            select_size_matched_peers,
+        )
+        self._policy_build = build_deep_investigation_steps
+        self._policy_peers = select_size_matched_peers
+        self.inner = ResearchOrchestrator(
+            provider,
+            synthesizer=synthesizer,
+            session_memory=session_memory,
+        )
+        self.provider = provider
+        self.last_trace = ExecutionTrace()
+
+    def run_deep(
+        self,
+        ticker: str,
+        discovery_rows: list[dict[str, Any]],
+    ) -> DeepInvestigationResult:
+        """Run the autonomous deep-investigation loop for *ticker*.
+
+        Parameters
+        ----------
+        ticker:
+            Ticker to investigate (e.g. "SUPA.JK").
+        discovery_rows:
+            Rows from a preceding DISCOVER run; used for peer selection by
+            asset size.  May be empty, in which case the policy uses rank
+            order as a fallback.
+        """
+        trace = ExecutionTrace()
+        self.last_trace = trace
+        trace.record("DEEP_INVESTIGATION_STARTED", ticker=ticker)
+
+        # ── Phase 1: run the standard 3-tool INVESTIGATE plan ────────────────
+        std_result = self.inner.run(f"Investigate {ticker}")
+        ledger = std_result.evidence_ledger
+        outputs: dict[str, ToolOutput] = dict(std_result.outputs)
+        trace.record(
+            "STANDARD_INVESTIGATE_COMPLETED",
+            evidence_count=len(ledger),
+            tool_count=len(outputs),
+        )
+
+        # ── Phase 2: autonomous policy loop ──────────────────────────────────
+        already_ran = set(outputs.keys())
+        decisions = self._policy_build(
+            ticker,
+            discovery_rows,
+            ledger,
+            already_ran_tools=already_ran,
+        )
+        all_decisions = list(decisions)
+
+        for decision in decisions:
+            trace.record(
+                "AGENT_DECISION",
+                step=decision.step,
+                observation=decision.observation,
+                decision=decision.decision,
+                reason=decision.reason,
+                tool=decision.tool,
+            )
+            if decision.decision != "RUN_TOOL" or decision.tool is None:
+                trace.record("AGENT_STOPPED", step=decision.step, reason=decision.reason)
+                break
+
+            # Execute the tool through the existing safe registry
+            task = ResearchTask(
+                tool=decision.tool,
+                purpose=decision.reason,
+                arguments=dict(decision.tool_arguments),
+            )
+            context = ToolExecutionContext(self.provider)
+            # Seed the context cache from already-completed outputs so tools
+            # that depend on discovery_data reuse the cached result.
+            if "discovery_data" not in context.cache and "discover_bank_anomalies" in outputs:
+                context.cache["discovery_data"] = self.provider.get_discovery_data()
+
+            try:
+                trace.record("TOOL_STARTED", tool=decision.tool, step=decision.step)
+                output = self.inner.router.route(task, context)
+                outputs[f"deep_{decision.step}_{decision.tool}"] = output
+                for evidence in output.evidence:
+                    if evidence.evidence_id not in {item.evidence_id for item in ledger}:
+                        ledger.add(evidence)
+                trace.record(
+                    "TOOL_COMPLETED",
+                    tool=decision.tool,
+                    step=decision.step,
+                    evidence_count=len(output.evidence),
+                )
+            except Exception as error:
+                trace.record(
+                    "TOOL_FAILED",
+                    tool=decision.tool,
+                    step=decision.step,
+                    error_type=type(error).__name__,
+                )
+                # Non-fatal: record limitation and continue
+                decision_idx = all_decisions.index(decision)
+                all_decisions[decision_idx] = type(decision)(
+                    step=decision.step,
+                    observation=decision.observation,
+                    decision=decision.decision,
+                    reason=decision.reason,
+                    tool=decision.tool,
+                    tool_arguments=decision.tool_arguments,
+                    limitation=f"Tool call failed: {type(error).__name__}",
+                )
+
+        # ── Phase 3: validate and synthesise ─────────────────────────────────
+        validator = EvidenceValidator()
+        validation_errors = {
+            evidence.evidence_id: errors
+            for evidence in ledger
+            if (errors := validator.validate(evidence))
+        }
+        trace.record(
+            "EVIDENCE_VALIDATED",
+            evidence_count=len(ledger),
+            valid=not validation_errors,
+            invalid_count=len(validation_errors),
+        )
+        if validation_errors:
+            raise EvidenceValidationError(
+                f"Evidence validation failed for {len(validation_errors)} records"
+            )
+
+        from dataclasses import asdict  # noqa: PLC0415
+        status = self.provider.status
+        synthesis = self.inner.synthesizer.synthesize(
+            f"Deep investigation of {ticker}",
+            {"intent": "INVESTIGATE", "ticker": ticker, "tasks": []},
+            ledger,
+            data_source=asdict(status),
+        )
+        trace.record(
+            "SYNTHESIS_COMPLETED",
+            generation_mode=synthesis.generation_mode,
+        )
+        trace.record("DEEP_INVESTIGATION_COMPLETED", step_count=len(all_decisions))
+
+        peer_tickers = self._policy_peers(ticker, discovery_rows, max_peers=4)
+        return DeepInvestigationResult(
+            ticker=ticker,
+            decisions=all_decisions,
+            evidence_ledger=ledger,
+            outputs=outputs,
+            synthesis=synthesis,
+            trace=trace,
+            peer_tickers_selected=peer_tickers,
         )
 
 
@@ -560,7 +795,41 @@ def _tool_get_company_evidence(
 ) -> ToolOutput:
     company = context.cache.get(f"company:{ticker}")
     if company is None:
-        company = context.provider.get_company_data(ticker)
+        try:
+            company = context.provider.get_company_data(ticker)
+        except Exception as primary_error:
+            # A4: If company_report fails (e.g. 401 Unauthorized on hackathon
+            # credits), fall back to the screener universe row that was already
+            # fetched during Discovery.  The fallback is Sectors-origin data —
+            # no value is fabricated.  The status warning records the degraded
+            # data quality explicitly so the UI and synthesis can reflect it.
+            try:
+                universe_result = context.provider.get_bank_universe()
+                frame = universe_result.universe.frame
+                ticker_key = ticker.strip().upper().removesuffix(".JK")
+                matches = frame[
+                    frame["ticker"].str.upper().str.removesuffix(".JK") == ticker_key
+                ]
+                if matches.empty:
+                    raise primary_error
+                row = matches.iloc[0].to_dict()
+                from nusa.providers.base import CompanyData, DataSourceStatus  # noqa: PLC0415
+                fallback_status = DataSourceStatus(
+                    mode=universe_result.status.mode,
+                    source="Sectors screener (company_report fallback)",
+                    is_live=universe_result.status.is_live,
+                    retrieved_at=universe_result.status.retrieved_at,
+                    warning=(
+                        f"company/report fetch failed ({type(primary_error).__name__}); "
+                        "using screener row as fallback. Company-report sections "
+                        "(overview, valuation) are unavailable."
+                    ),
+                )
+                company = CompanyData(
+                    ticker=ticker, data={"screener_row": row}, status=fallback_status
+                )
+            except Exception:
+                raise primary_error from None
         context.cache[f"company:{ticker}"] = company
     data = context.discovery_data()
     evidence = _evidence_for_tickers(data.evidence_ledger, [ticker])
