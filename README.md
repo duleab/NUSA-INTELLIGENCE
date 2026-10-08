@@ -9,11 +9,16 @@
 
 NUSA Intelligence revolutionizes financial analysis with autonomous AI agents that discover, investigate, and validate unusual financial changes across Indonesian banking institutions. Combining deterministic quantitative analysis with sophisticated AI orchestration, NUSA provides transparent, evidence-backed insights for professional financial research.
 
-## Demo Video
+## 🎥 Demo Video Walkthrough
 
-[![NUSA Intelligence Demo](https://img.youtube.com/vi/demo/maxresdefault.jpg)](https://github.com/duleab/NUSA-INTELLIGENCE/issues/1#issue-5765712292)
+[![Watch NUSA Intelligence Demo Video](https://img.shields.io/badge/▶%20Watch%20Demo%20Video-GitHub%20Issue%20%231-blue?style=for-the-badge&logo=github)](https://github.com/duleab/NUSA-INTELLIGENCE/issues/1#issue-5765712292)
 
-Watch the complete NUSA Intelligence demonstration showcasing autonomous banking analysis, real-time discovery, and professional reporting capabilities.
+> 📹 **Demonstration Video Link:** [**Nusa Intelligence Walkthrough (GitHub Issue #1)**](https://github.com/duleab/NUSA-INTELLIGENCE/issues/1#issue-5765712292)  
+> Direct Video Asset: [`Nusa.Intelligence001.mp4`](https://github.com/user-attachments/assets/58fa6f94-b06c-4a4d-a84c-5072e151cd68)
+
+https://github.com/user-attachments/assets/58fa6f94-b06c-4a4d-a84c-5072e151cd68
+
+*Watch the complete NUSA Intelligence demonstration showcasing autonomous banking analysis, real-time discovery, 48-bank universe screening, and evidence-grounded research reporting.*
 
 ---
 
@@ -47,9 +52,12 @@ Watch the complete NUSA Intelligence demonstration showcasing autonomous banking
 
 ## Screenshots & Interface Preview
 
-### Indonesian Banking Universe - Complete Analysis Overview
+### Indonesian Banking Universe (48 IDX Banks)
+
 ![Indonesian Banking Universe](./assets/Screenshots/Indonesian%20Banking%20Universe%20bank%20pic%202.png)
-*Complete overview of the Indonesian banking sector with comprehensive analysis across all 48 IDX-listed banks, showing market coverage and sector-wide insights*
+
+![NUSA Banking Universe Details](./assets/Screenshots/nusa%20bank%20pic%202.png)
+
 
 ### Discovery Dashboard - Enhanced Banking Analysis
 ![NUSA Discovery Interface](./assets/Screenshots/nusa%20pic%20NUSA%20Intelligence%201.png)
